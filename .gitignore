@@ -9,3 +9,11 @@ Thumbs.db
 
 # Note: dist/ is intentionally NOT ignored. The bundled action entrypoint
 # (dist/index.js) is committed so consumers can run the action directly.
+
+# The global ~/.gitignore_global ignores .claude/ everywhere. For THIS project
+# we track the project agents + rules. Re-include the dir, re-ignore its
+# contents, then re-include only agents/ and rules/.
+!.claude/
+.claude/*
+!.claude/agents/
+!.claude/rules/
