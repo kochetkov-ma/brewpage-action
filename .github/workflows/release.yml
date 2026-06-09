@@ -72,32 +72,11 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          # Quoted heredoc: NOTHING inside expands. The literal
-          # ${{ steps.publish.outputs.url }} below is written verbatim so it
-          # reaches the published notes (it would blank out if the release job's
-          # Actions expression engine ever saw it). The tag is a placeholder
-          # (__TAG__) substituted afterwards from $TAG via sed.
-          cat > release-notes-header.md <<'EOF'
-          ## Publish to BrewPage __TAG__
-
-          Marketplace: https://github.com/marketplace/actions/publish-to-brewpage?version=__TAG__
-
-          ### Quick start
-
-          ```yaml
-          - uses: kochetkov-ma/brewpage-action@v1
-            id: publish
-            with:
-              path: ./report.html
-          - run: echo "${{ steps.publish.outputs.url }}"
-          ```
-
-          Full inputs/outputs, redeploy flow and examples -> [README](https://github.com/kochetkov-ma/brewpage-action#readme)
-
-          ---
-          EOF
-          # __TAG__ is not a shell/Actions expression, so sed replaces only it,
-          # leaving the literal ${{ ... }} untouched.
+          # The header template lives in a COMMITTED markdown file. GitHub
+          # evaluates expression syntax only inside workflow YAML, never inside a
+          # plain .md file, so the literal output-reference snippet survives into
+          # the published notes. We only substitute the __TAG__ placeholder.
+          cp .github/release-notes-header.md release-notes-header.md
           sed -i "s|__TAG__|${TAG}|g" release-notes-header.md
           echo "----- generated header -----"
           cat release-notes-header.md
