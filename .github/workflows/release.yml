@@ -1,0 +1,23 @@
+name: Release
+
+# Tag-driven release notice. Publishing to the GitHub Actions Marketplace is a
+# MANUAL step done by the repo owner via the Release UI (2FA-gated). This
+# workflow intentionally does NOT auto-publish -- it only records the procedure.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release-notice:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Marketplace publish reminder
+        run: |
+          echo "Tag ${GITHUB_REF_NAME} pushed."
+          echo "Manual steps to publish/update on the Marketplace:"
+          echo "  1. Open the Releases page and draft a release for ${GITHUB_REF_NAME}."
+          echo "  2. Tick 'Publish this Action to the GitHub Marketplace'."
+          echo "  3. Confirm category + branding, then publish (2FA may be required)."
+          echo "  4. Move the major tag (e.g. v1) to this commit for clean @v1 semantics."

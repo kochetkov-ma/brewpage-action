@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-action:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.4.0
+        with:
+          node-version: '20'
+
+      - name: Validate action.yml is well-formed YAML
+        run: npx --yes js-yaml action.yml > /dev/null
+
+      - name: Assert required metadata is present
+        run: |
+          set -euo pipefail
+          for key in name description runs; do
+            if ! grep -qE "^${key}:" action.yml; then
+              echo "::error::action.yml is missing required top-level key: ${key}"
+              exit 1
+            fi
+          done
+          echo "action.yml metadata OK"
