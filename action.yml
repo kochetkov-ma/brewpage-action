@@ -1,5 +1,5 @@
 name: 'Publish to BrewPage'
-description: 'Publish CI artefacts (HTML/Playwright reports, build outputs) to BrewPage and expose the live URL as a job output.'
+description: 'Publish CI artefacts -- HTML, markdown, multi-file sites, and files -- to BrewPage (https://brewpage.app) and expose the live URL as a job output.'
 author: 'kochetkov-ma'
 
 branding:
@@ -8,114 +8,67 @@ branding:
 
 inputs:
   path:
-    description: 'File, directory, or zip to publish.'
+    description: 'File, directory, or .zip to publish.'
     required: true
   kind:
     description: 'Artefact kind: html | markdown | site | file | auto.'
     required: false
     default: 'auto'
   namespace:
-    description: 'Target namespace. Default "public" is listed in the gallery and search-indexed; set a private namespace to keep it unlisted.'
+    description: 'Target namespace. Empty derives a deterministic per-repo slug from github.repository. The default "public" namespace is gallery-listed on https://brewpage.app and search-indexed; set a private namespace to keep the resource unlisted.'
     required: false
-    default: 'public'
+    default: ''
   password:
-    description: 'Optional password. When set, the resource is marked private.'
+    description: 'Optional password. When set, the resource is private (hidden from the brewpage.app gallery).'
     required: false
     default: ''
   ttl-days:
     description: 'Time to live in days (1..30).'
     required: false
     default: '15'
-  update-token:
-    description: 'Owner token of an existing resource to update. Must be paired with update-id.'
+  tags:
+    description: 'Comma-separated tags.'
+    required: false
+    default: ''
+  owner-token:
+    description: 'X-Owner-Token for the resource. Empty auto-mints a token that is surfaced in the job summary -- persist it as a secret for redeploys.'
     required: false
     default: ''
   update-id:
-    description: 'Id of an existing resource to update. Must be paired with update-token.'
+    description: 'Id of an existing resource. With owner-token, updates the existing resource (PUT) instead of creating a new one.'
+    required: false
+    default: ''
+  entry:
+    description: 'Site entry file override (default index.html).'
+    required: false
+    default: ''
+  show-top-bar:
+    description: 'HTML only: toggle the BrewPage toolbar.'
     required: false
     default: ''
   brewpage-url:
-    description: 'Override the BrewPage API base URL. Empty uses the CLI default (https://brewpage.app).'
+    description: 'API base URL override. Empty uses https://brewpage.app.'
     required: false
     default: ''
-  token:
-    description: 'Optional owner/publish token for authenticated publishing.'
+  fail-on-error:
+    description: 'When false, warn instead of failing the step on error.'
     required: false
-    default: ''
+    default: 'true'
 
 outputs:
   url:
-    description: 'Live URL of the published resource.'
-    value: ${{ steps.publish.outputs.url }}
+    description: 'Live URL of the published resource on brewpage.app.'
+  owner-url:
+    description: 'API/owner URL for managing the resource.'
   owner-token:
-    description: 'Owner token for managing the resource (masked in logs). Store it as a secret -- losing it makes the resource unmanageable.'
-    value: ${{ steps.publish.outputs.owner-token }}
+    description: 'Owner token (masked in logs). Persist to a secret to manage/redeploy the resource.'
   id:
     description: 'Resource id.'
-    value: ${{ steps.publish.outputs.id }}
+  namespace:
+    description: 'Namespace the resource was published to.'
+  expires-at:
+    description: 'Expiry timestamp.'
 
 runs:
-  using: 'composite'
-  steps:
-    - name: Set up Node.js
-      uses: actions/setup-node@v6.4.0
-      with:
-        node-version: '20'
-
-    - name: Validate update pair
-      shell: bash
-      run: |
-        if [ -n "${{ inputs.update-token }}" ] && [ -z "${{ inputs.update-id }}" ]; then
-          echo "::error::update-token was provided without update-id. Provide both to update an existing resource."
-          exit 1
-        fi
-        if [ -n "${{ inputs.update-id }}" ] && [ -z "${{ inputs.update-token }}" ]; then
-          echo "::error::update-id was provided without update-token. Provide both to update an existing resource."
-          exit 1
-        fi
-
-    - name: Publish to BrewPage
-      id: publish
-      shell: bash
-      env:
-        IN_PATH: ${{ inputs.path }}
-        IN_KIND: ${{ inputs.kind }}
-        IN_NAMESPACE: ${{ inputs.namespace }}
-        IN_PASSWORD: ${{ inputs.password }}
-        IN_TTL_DAYS: ${{ inputs.ttl-days }}
-        IN_UPDATE_TOKEN: ${{ inputs.update-token }}
-        IN_UPDATE_ID: ${{ inputs.update-id }}
-        IN_BREWPAGE_URL: ${{ inputs.brewpage-url }}
-        IN_TOKEN: ${{ inputs.token }}
-      run: |
-        set -euo pipefail
-
-        args=(publish "$IN_PATH" --json)
-        [ -n "$IN_KIND" ] && args+=(--kind "$IN_KIND")
-        [ -n "$IN_NAMESPACE" ] && args+=(--namespace "$IN_NAMESPACE")
-        [ -n "$IN_PASSWORD" ] && args+=(--password "$IN_PASSWORD")
-        [ -n "$IN_TTL_DAYS" ] && args+=(--ttl-days "$IN_TTL_DAYS")
-        [ -n "$IN_UPDATE_TOKEN" ] && args+=(--update-token "$IN_UPDATE_TOKEN")
-        [ -n "$IN_UPDATE_ID" ] && args+=(--update-id "$IN_UPDATE_ID")
-        [ -n "$IN_BREWPAGE_URL" ] && args+=(--url "$IN_BREWPAGE_URL")
-        [ -n "$IN_TOKEN" ] && args+=(--token "$IN_TOKEN")
-
-        # Pinned CLI version -- bump explicitly per action release (do NOT use @latest).
-        out="$(npx --yes brewpage@0.1.0 "${args[@]}")"
-
-        url="$(echo "$out" | jq -r '.url // empty')"
-        owner_token="$(echo "$out" | jq -r '.ownerToken // empty')"
-        id="$(echo "$out" | jq -r '.id // empty')"
-
-        # Mask BEFORE writing any output -- ordering matters; masking after-the-fact does not redact prior log lines.
-        if [ -n "$owner_token" ]; then
-          echo "::add-mask::$owner_token"
-        fi
-
-        {
-          echo "url=$url"
-          echo "owner-token=$owner_token"
-          echo "id=$id"
-        } >> "$GITHUB_OUTPUT"
-
-        echo "Published: $url"
+  using: 'node24'
+  main: 'dist/index.js'

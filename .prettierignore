@@ -1,0 +1,13 @@
+dist/
+node_modules/
+coverage/
+package-lock.json
+rollup.config.ts
+
+# Repo docs / rules / action metadata are maintained by hand, not by Prettier.
+.claude/
+.github/
+CLAUDE.md
+README.md
+LICENSE
+action.yml

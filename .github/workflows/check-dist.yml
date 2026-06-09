@@ -1,0 +1,51 @@
+name: Check dist
+
+# A node24 TypeScript action ships a COMMITTED bundle (dist/index.js) as its
+# entrypoint -- consumers run dist/, not src/. If a committed dist/ goes stale
+# vs the source, consumers silently run old code. This workflow rebuilds the
+# bundle from source and fails if the result differs from what is committed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-dist:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6.4.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild bundle
+        run: npm run build
+
+      - name: Compare committed dist/ with rebuild
+        id: diff
+        run: |
+          set -euo pipefail
+          if [ -n "$(git status --porcelain dist/)" ]; then
+            echo "::error::Committed dist/ is out of date. Run 'npm run build' and commit the result."
+            git diff --stat -- dist/
+            git diff -- dist/ > dist-drift.patch
+            exit 1
+          fi
+          echo "dist/ is in sync"
+
+      - name: Upload drift diff
+        if: ${{ failure() && steps.diff.outcome == 'failure' }}
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: dist-drift
+          path: dist-drift.patch
+          if-no-files-found: ignore

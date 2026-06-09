@@ -1,4 +1,4 @@
-[DICT: ACT=GitHub Action, BP=BrewPage, CLI=brewpage-cli npm pkg, MKT=GitHub Marketplace, NS=namespace, OT=owner-token, REL=release, REPO=repository, SPEC=openapi/openapi.yaml in brewpage-openapi, WF=workflow]
+[DICT: ACT=GitHub Action, BP=BrewPage, MKT=GitHub Marketplace, NS=namespace, OT=owner-token, REL=release, REPO=repository, SPEC=openapi/openapi.yaml in brewpage-openapi, WF=workflow]
 
 # CLAUDE.md — brewpage-action
 
@@ -6,13 +6,11 @@ Agent scope: develop THIS REPO only — the "Publish to BP" ACT. Read before tou
 
 ## 1. Purpose
 
-Single composite ACT (`action.yml` @ REPO root). Publishes CI artefacts (HTML reports, Playwright reports, generated docs, build outputs) to BP from inside a GH WF in one step. Exposes live URL + resource id + OT as job outputs.
+Node24 TypeScript ACT (`runs.using: node24`, `main: dist/index.js` — committed bundle). NOT composite. Publishes CI artefacts (HTML reports, Playwright reports, generated docs, build outputs) to BP from inside a GH WF in one step. Exposes live URL + resource id + OT as job outputs. Works end-to-end via direct BP REST — no external CLI.
 
 BP: proprietary HTML/KV/JSON/file hosting @ <https://brewpage.app>. This REPO ships only ACT glue — not the platform.
 
 MKT listing: `Publish to BrewPage`. ACT ref: `kochetkov-ma/brewpage-action@v1`.
-
-> WARN: pre-release (v0), BLOCKED. Publish step calls `npx brewpage` (CLI), which is not yet published to npm. Composite scaffold, inputs, outputs, validation, OT masking are complete + MKT-ready, but ACT cannot publish end-to-end until CLI ships OR ACT switches to direct REST (sec 4). State this plainly — !=pretend ACT works end-to-end.
 
 ## 2. Cross-links
 
@@ -20,73 +18,74 @@ MKT listing: `Publish to BrewPage`. ACT ref: `kochetkov-ma/brewpage-action@v1`.
 |------|-------|
 | API contract / src of truth | `kochetkov-ma/brewpage-openapi` — <https://github.com/kochetkov-ma/brewpage-openapi>, SPEC |
 | Live platform / default API base | <https://brewpage.app> |
-| CLI dep (pre-release) | `kochetkov-ma/brewpage-cli` — <https://github.com/kochetkov-ma/brewpage-cli> (npm pkg `brewpage`) |
 
 For any endpoint/param/header/response-field question: read SPEC. !=guess REST shape.
 
-Relevant publish ops in SPEC:
-- `POST /api/html` (`create_1`) — HTML/markdown. Params: `?ns=`, `?ttl=` (1..30d), `?format=html|markdown`, `?tags=`; headers `X-Password`, `X-Owner-Token`. Returns `HtmlUploadResponse`.
-- `POST /api/files` (`upload`) — binary file upload.
-- `POST /api/sites` (`uploadSite`) — multi-file static sites (`kind: site`, e.g. Playwright report dir). `PUT /api/sites/{ns}/{id}` republishes.
-- Reads/mgmt: `GET /{ns}/{id}` (`resolve`), `GET /api/stats`, DELETE ops, `republishSite`.
+Endpoints the ACT actually calls (SPEC):
+- `GET /api/owner-token` — mint an OT when caller supplies none.
+- `POST /api/html` (create) / `PUT /api/html/{ns}/{id}` (update) — HTML/markdown. Params: `?ns=`, `?ttl=` (1..30d), `?format=html|markdown`, `?tags=`; headers `X-Password`, `X-Owner-Token`. Returns `HtmlUploadResponse`.
+- `POST /api/files` — binary file upload (immutable; no PUT update).
+- `POST /api/sites` (create) / `PUT /api/sites/{ns}/{id}` (update) — multi-file static sites (`kind: site`, e.g. Playwright report dir).
 
 Backend (Spring/Kotlin), frontend, infra: NOT in any of these REPOs. SPEC is the only contract.
 
 ## 3. Architecture
 
-`runs.using: composite` — no Docker image, no JS entrypoint; declarative metadata + bash steps.
+`runs.using: node24`, `main: dist/index.js` — single committed bundle (Rollup). No Docker image, no composite bash steps. TS source in `src/`, runtime dep `@actions/core` only; HTTP via native `fetch`/`FormData`/`Blob` (Node 24 undici).
 
-Flow: `inputs → setup-node → validate update-token/update-id pair → publish step → outputs`
+Flow: `inputs → mint-or-reuse OT (setSecret) → detect kind + resolve NS → route create (POST) | update (PUT) → outputs + job summary`
 
 ### Inputs (keep in lockstep with `action.yml`)
 
 | Input | Req | Default | Description |
 |-------|-----|---------|-------------|
-| `path` | yes | — | File, dir, or zip to publish. |
+| `path` | yes | — | File, dir, or `.zip` to publish. |
 | `kind` | no | `auto` | `html` \| `markdown` \| `site` \| `file` \| `auto` |
-| `namespace` | no | `public` | Target NS. `public` = gallery-listed + search-indexed. |
-| `password` | no | _(empty)_ | Set → resource marked private. |
+| `namespace` | no | _(empty)_ | Empty derives per-repo slug from `github.repository`. `public` = gallery-listed + search-indexed. |
+| `password` | no | _(empty)_ | Set → resource private (hidden from gallery). |
 | `ttl-days` | no | `15` | TTL in days (1..30). |
-| `update-token` | no | _(empty)_ | OT of existing resource to update. Pair with `update-id`. |
-| `update-id` | no | _(empty)_ | Id of existing resource to update. Pair with `update-token`. |
-| `brewpage-url` | no | _(empty)_ | Override API base URL. Empty = `https://brewpage.app`. |
-| `token` | no | _(empty)_ | Optional owner/publish token for authenticated publishing. |
+| `tags` | no | _(empty)_ | Comma-separated tags. |
+| `owner-token` | no | _(empty)_ | OT for the resource. Empty auto-mints one (surfaced in job summary). |
+| `update-id` | no | _(empty)_ | Id of existing resource. With `owner-token` → updates via PUT. |
+| `entry` | no | _(empty)_ | Site entry file override (default `index.html`). |
+| `show-top-bar` | no | _(empty)_ | HTML only: toggle the BP toolbar. |
+| `brewpage-url` | no | _(empty)_ | API base URL override. Empty = `https://brewpage.app`. |
+| `fail-on-error` | no | `true` | When `false`, warn instead of failing the step on error. |
 
-`update-token` / `update-id` validated in dedicated bash step; fails fast with `::error::` if exactly one supplied.
+Update routing handled in TS (`src/main.ts`): `owner-token` + `update-id` present → PUT (update existing); else POST (create new).
 
 ### Outputs (keep in lockstep with `action.yml`)
 
 | Output | Description |
 |--------|-------------|
 | `url` | Live URL of published resource. |
+| `owner-url` | API/owner URL for managing the resource. |
 | `owner-token` | OT for managing resource. Masked in logs. |
 | `id` | Resource id. |
-
-Publish step builds `brewpage publish <path> --json ...`, captures stdout, parses `url`/`ownerToken`/`id` via `jq`.
+| `namespace` | NS the resource was published to. |
+| `expires-at` | Expiry timestamp. |
 
 ### Hard rules — !=regress
 
-1. **Mask OT before writing anywhere.** Emit `echo "::add-mask::$owner_token"` BEFORE writing `owner-token=...` to `$GITHUB_OUTPUT` and before any log line that could contain it. `::add-mask::` only redacts lines printed AFTER it. OT = only credential that can manage/delete/republish a resource — leaking | losing it → resource unmanageable forever.
-2. **Preserve NS `public` warning.** Default NS `public` = listed in BP homepage gallery + search-indexed. Private resources require custom NS + password. Mirror stance from `brewpage-openapi` SPEC preamble; keep warning in `action.yml` + `README.md`.
+1. **Mask OT before writing anywhere.** Call `core.setSecret(ownerToken)` BEFORE `core.setOutput('owner-token', ...)` and before any log/summary line that could contain it. Masking only redacts output emitted AFTER the `setSecret` call. OT = only credential that can manage/delete/republish a resource — leaking | losing it → resource unmanageable forever.
+2. **Preserve NS `public` warning.** Default/`public` NS = listed in BP homepage gallery + search-indexed. Private resources require custom NS + password. Mirror stance from `brewpage-openapi` SPEC preamble; keep warning in `action.yml` + `README.md`.
 
-Use `echo "name=value" >> $GITHUB_OUTPUT`. !=deprecated `::set-output::` WF cmd.
+`@actions/core` (`setOutput`) writes `$GITHUB_OUTPUT`. !=deprecated `::set-output::` WF cmd.
 
-## 4. Open architecture decision (unresolved — !=bake in a side)
+## 4. Architecture decision (RESOLVED)
 
-Publish step currently: `npx --yes brewpage@<pinned> publish ...`. CLI not on npm → ACT blocked. Two live options:
+Decided this session: ACT calls BP REST directly via native `fetch`/`FormData`/`Blob` (Node 24 undici) — zero HTTP deps, only runtime dep `@actions/core`. NO CLI. Artefact-kind routing (`html`|`markdown`|`site`|`file`) lives in TS (`src/`). Rationale: self-contained, works now, no external pkg to ship/version-pin.
 
-- **Option A — keep CLI dep.** Once CLI ships, pin to exact ver (`brewpage@X.Y.Z`, !=`@latest`); bump explicitly per ACT REL; record CLI ver in REL notes. Pro: one place owns publish logic. Con: ACT stays blocked until CLI ships + carries Node+npm install on every run.
-- **Option B — call BP REST API directly** via `curl`+`jq`; ACT self-contained + immediately usable. Contract: SPEC (sec 2 for ops/params/headers). Pro: no external pkg, works now. Con: ACT re-implements artefact-kind routing (`html`|`file`|`site`) that CLI would centralise.
-
-Decision NOT made. When resolved: update this section + record decision in `brewpage-openapi/ECOSYSTEM-PLAN.md`.
+Follow-up (different repo): record this decision in `brewpage-openapi/ECOSYSTEM-PLAN.md`.
 
 ## 5. Release / MKT flow
 
-- Tags: unprefixed semver `vX.Y.Z` (e.g. `v1.0.0`). One pkg per REPO → no tag prefix → keeps `@v1` major ref clean for Actions MKT.
-- MKT publish: manual. No auto-publish. `.github/workflows/release.yml` fires on `v*` tags, prints reminder only. Owner drafts GH Release for tag → ticks "Publish this Action to the GitHub Marketplace" → confirms category+branding → publishes. 2FA may be REQ. !=auto-publish unverified ACT from CI.
-- After each REL: move major tag `v1` to new commit so `@v1` consumers pick it up.
-- `gh` CLI authed as `kochetkov-ma`; REPO is public.
-- MKT metadata REQ in `action.yml`: `name`, `description`, `branding` (cur: `icon: upload-cloud`, `color: purple`). All three mandatory for MKT listing — !=remove.
+AUTOMATED. Flow:
+- `release-please.yml` (`googleapis/release-please-action`) maintains version from Conventional Commits + opens/maintains a release PR on merge to `main`.
+- Merging that PR → unprefixed semver tag `vX.Y.Z` (e.g. `v1.0.0`). One pkg per REPO → no tag prefix → keeps `@v1` major ref clean for Actions MKT.
+- `release.yml` fires on the `v*` tag → builds, creates the GitHub Release (`softprops/action-gh-release`), auto-moves major tag `v1` to the released commit (force-push), updates the MKT listing.
+- Only the FIRST MKT listing needs a one-time manual ToS acceptance in the Release UI; subsequent releases publish automatically.
+- MKT metadata REQ in `action.yml`: `name`, `description`, `branding` (cur: `icon: upload-cloud`, `color: purple`). All three mandatory — !=remove.
 
 ## 6. Ecosystem context
 
@@ -100,41 +99,43 @@ Per-repo rationale (!=consolidate back to monorepo):
 
 Mandatory cross-link rule: every REPO, README, MKT page must back-link to <https://brewpage.app> + <https://github.com/kochetkov-ma/brewpage-openapi>. Keep in `README.md`.
 
-Sibling modules (each `kochetkov-ma/brewpage-*` REPO): `brewpage-cli` (direct dep), `brewpage-client-ts`, `brewpage-client-python`, `brewpage-cli-python`, `homebrew-tap`, `brewpage-vscode`, `brewpage-chrome`, `brewpage-docs`, `brewpage-hf-space`, `brewpage-cookbook` (first prod consumer — dogfoods this ACT). MCP server (`brewpage-mcp`) ships from `brewpage-openapi` as explicit exception.
+Sibling modules (each `kochetkov-ma/brewpage-*` REPO): `brewpage-cli`, `brewpage-client-ts`, `brewpage-client-python`, `brewpage-cli-python`, `homebrew-tap`, `brewpage-vscode`, `brewpage-chrome`, `brewpage-docs`, `brewpage-hf-space`, `brewpage-cookbook` (first prod consumer — dogfoods this ACT). MCP server (`brewpage-mcp`) ships from `brewpage-openapi` as explicit exception.
 
 ## 7. Drift + conventions
 
 When inputs/outputs change, update ALL THREE in same change:
 1. `action.yml` (real inputs/outputs)
 2. `README.md` (inputs table, outputs table, usage examples)
-3. `modules/action/README.md` in `brewpage-openapi` REPO (reference snapshot — lists planned inputs/outputs, !=drift)
+3. `modules/action/README.md` in `brewpage-openapi` REPO (reference snapshot — lists planned inputs/outputs, !=drift). Follow-up (different repo): still needs syncing to the new contract.
 
-**Version pinning — no exceptions.** Pin every `uses:` in this REPO's WFs + any CLI ver to exact `vX.Y.Z` / `X.Y.Z`. Forbidden: `@latest`, floating major shorthand `@v4`, `@main`. Current pins: `actions/setup-node@v6.4.0`, `actions/checkout@v6.0.3`, CLI as `brewpage@0.1.0` — keep this discipline when adding/bumping. (Consumers may still ref ACT as `@v1` — that is published major-tag contract, separate from how THIS REPO pins its own deps.)
+**Version pinning — no exceptions.** Every `package.json` dep pinned exact (`X.Y.Z`, no `^`/`~`); every WF `uses:` pinned exact `vX.Y.Z`. Forbidden: `@latest`, floating major shorthand `@v4`, `@main`. Current WF pins: `actions/checkout@v6.0.3`, `actions/setup-node@v6.4.0`, `softprops/action-gh-release@v3.0.0`, `googleapis/release-please-action@v5.0.0`, `actions/upload-artifact@v7.0.1`. (Consumers may still ref ACT as `@v1` — published major-tag contract, separate from how THIS REPO pins its own deps.)
+
+**Commit `dist/`.** The node24 ACT runs the committed bundle, not source. Every change to `src/` → `npm run build` → commit `dist/`. `check-dist.yml` CI rebuilds and fails on `git diff --exit-code dist/` drift, so a stale bundle never ships.
 
 License: MIT (`LICENSE`).
 
 ## 8. Commands
 
 ```bash
+# Install deps + full pipeline (lint + test + build):
+npm ci && npm run all
+
+# Rebuild the committed bundle after any src/ change:
+npm run build
+
+# check-dist: fail if committed dist/ drifts from a fresh rebuild (CI mirror):
+npm run build && git diff --exit-code dist/
+
 # Validate action.yml is well-formed YAML (CI does this):
 npx --yes js-yaml action.yml > /dev/null
 
-# Assert REQ MKT metadata present (CI mirror):
-for key in name description runs; do grep -qE "^${key}:" action.yml || echo "MISSING: $key"; done
-
-# Manual local smoke test (once CLI/REST path works):
-# Add workflow_dispatch WF that does `uses: ./`; trigger from Actions tab. Do BEFORE tagging.
-
-# Cut a REL (manual MKT publish follows in Release UI):
-git tag vX.Y.Z && git push --follow-tags
-# Move major tag:
-git tag -f v1 && git push -f origin v1
+# Release (AUTOMATED): merge the release-please PR on main; that pushes tag vX.Y.Z,
+# which triggers release.yml (GitHub Release + major-tag move + MKT update).
 ```
 
-CI: `.github/workflows/ci.yml` (YAML validation + metadata check on push/PR), `.github/workflows/release.yml` (tag-driven MKT reminder). No unit-test suite — validation = YAML parse + metadata assertion + manual `workflow_dispatch` smoke test before tagging.
+CI: `ci.yml` (npm ci + lint + test + build + js-yaml validation), `check-dist.yml` (rebuild + dist/ drift guard), `release-please.yml` (Conventional-Commits version + release PR), `release.yml` (tag-driven GitHub Release + major-tag move + MKT publish).
 
 ## Links
 
 - BP — <https://brewpage.app>
 - OpenAPI contract (src of truth) — <https://github.com/kochetkov-ma/brewpage-openapi>
-- CLI dep — <https://github.com/kochetkov-ma/brewpage-cli>

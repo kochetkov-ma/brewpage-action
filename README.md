@@ -1,41 +1,89 @@
 # brewpage-action
 
-Publish CI artefacts -- HTML reports, Playwright reports, generated docs, build outputs -- to [BrewPage](https://brewpage.app) from a GitHub workflow. One step, one live URL as a job output.
+Publish CI artefacts -- HTML reports, markdown, multi-file sites (Playwright reports, generated docs, static builds), and single files -- to [BrewPage](https://brewpage.app) from a GitHub workflow. One step, one live URL on [brewpage.app](https://brewpage.app) as a job output.
 
 [![Marketplace](https://img.shields.io/badge/marketplace-Publish%20to%20BrewPage-purple)](https://github.com/marketplace/actions/publish-to-brewpage)
 
-## Status
-
-> **Pre-release (v0) -- BLOCKED on `brewpage-cli`.**
-> This action shells out to `npx brewpage`, the [`brewpage-cli`](https://github.com/kochetkov-ma/brewpage-cli) npm package, which is **not yet published to npm**. The action cannot actually publish until that CLI ships. The composite scaffold, inputs, outputs, and masking discipline are complete and Marketplace-ready; only the underlying CLI is missing.
-
 ## What it does
 
-Runs `npx brewpage publish <path>` with your inputs mapped to flags, captures the result, and exposes the live URL, resource id, and owner token as step outputs. The owner token is masked in the log via `::add-mask::` before it is ever written.
+A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://brewpage.app) directly over the REST API (no CLI, no extra install). It detects the artefact kind, uploads it, and exposes the live URL, resource id, owner token, namespace, and expiry as step outputs. The owner token is masked in the log via `core.setSecret` before it is ever written or summarised.
 
 ## Inputs
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `path` | yes | -- | File, directory, or zip to publish. |
+| `path` | yes | -- | File, directory, or `.zip` to publish to [brewpage.app](https://brewpage.app). |
 | `kind` | no | `auto` | Artefact kind: `html`, `markdown`, `site`, `file`, or `auto`. |
-| `namespace` | no | `public` | Target namespace. `public` is listed in the gallery and search-indexed; set a private namespace to keep it unlisted. |
-| `password` | no | _(empty)_ | Optional password. When set, the resource is marked private. |
-| `ttl-days` | no | `15` | Time to live in days (1..30). |
-| `update-token` | no | _(empty)_ | Owner token of an existing resource to update. Must be paired with `update-id`. |
-| `update-id` | no | _(empty)_ | Id of an existing resource to update. Must be paired with `update-token`. |
-| `brewpage-url` | no | _(empty)_ | Override the BrewPage API base URL. Empty uses the CLI default (`https://brewpage.app`). |
-| `token` | no | _(empty)_ | Optional owner/publish token for authenticated publishing. |
+| `namespace` | no | _(empty)_ | Target namespace. Empty derives a deterministic per-repo slug from `github.repository`. The default `public` namespace is gallery-listed on [brewpage.app](https://brewpage.app) and search-indexed; set a private namespace to keep the resource unlisted. |
+| `password` | no | _(empty)_ | When set, the resource is private and hidden from the [brewpage.app](https://brewpage.app) gallery. |
+| `ttl-days` | no | `15` | Time to live in days (1..30) before the resource expires on [brewpage.app](https://brewpage.app). |
+| `tags` | no | _(empty)_ | Comma-separated tags used for search and grouping on [brewpage.app](https://brewpage.app). |
+| `owner-token` | no | _(empty)_ | `X-Owner-Token` for the resource. Empty auto-mints a token surfaced in the job summary -- persist it as a secret for redeploys. |
+| `update-id` | no | _(empty)_ | Id of an existing resource on [brewpage.app](https://brewpage.app). With `owner-token`, updates that resource (PUT) instead of creating a new one. |
+| `entry` | no | _(empty)_ | Site entry file override (default `index.html`). |
+| `show-top-bar` | no | _(empty)_ | HTML only: toggle the [brewpage.app](https://brewpage.app) toolbar. |
+| `brewpage-url` | no | _(empty)_ | API base URL override. Empty uses `https://brewpage.app`. |
+| `fail-on-error` | no | `true` | When `false`, warn instead of failing the step on error. |
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `url` | Live URL of the published resource. |
-| `owner-token` | Owner token for managing the resource (masked in logs). Store it as a secret -- losing it makes the resource unmanageable. |
+| `url` | Live URL of the published resource on [brewpage.app](https://brewpage.app). |
+| `owner-url` | API/owner URL for managing the resource. |
+| `owner-token` | Owner token (masked in logs). Persist to a secret to manage/redeploy the resource. |
 | `id` | Resource id. |
+| `namespace` | Namespace the resource was published to. |
+| `expires-at` | Expiry timestamp. |
+
+> **Public namespace warning.** The default/`public` namespace is gallery-listed on [brewpage.app](https://brewpage.app) and search-indexed. To keep a resource unlisted and private, set a custom `namespace` **and** a `password`.
 
 ## Usage
+
+### First publish (no owner token)
+
+On the first run leave `owner-token` empty. The action mints a token and prints it in the job summary. Read the `owner-token` output and store it as a repo secret so future runs can update the same resource.
+
+```yaml
+- name: Publish HTML report
+  id: brewpage
+  uses: kochetkov-ma/brewpage-action@v1
+  with:
+    path: ./report.html
+    kind: html
+
+- name: Show live URL
+  run: echo "Published to ${{ steps.brewpage.outputs.url }}"
+
+# Persist the minted owner token to a repo secret (one-time).
+# Requires a token with secrets:write, e.g. a fine-grained PAT in GH_PAT.
+- name: Save owner token as a secret
+  env:
+    GH_TOKEN: ${{ secrets.GH_PAT }}
+    OWNER_TOKEN: ${{ steps.brewpage.outputs.owner-token }}
+    RESOURCE_ID: ${{ steps.brewpage.outputs.id }}
+  run: |
+    gh secret set BREWPAGE_OWNER_TOKEN --body "$OWNER_TOKEN"
+    gh variable set BREWPAGE_ID --body "$RESOURCE_ID"
+```
+
+> The minted `owner-token` is the only credential that can manage, update, or delete the resource on [brewpage.app](https://brewpage.app). Losing it makes the resource unmanageable. Copy it from the job summary if you do not automate the secret step above.
+
+### Redeploy / update an existing resource
+
+Pass the saved `owner-token` plus the `update-id` to update the same resource in place (PUT) instead of creating a new one.
+
+```yaml
+- name: Redeploy report
+  uses: kochetkov-ma/brewpage-action@v1
+  with:
+    path: ./report.html
+    kind: html
+    owner-token: ${{ secrets.BREWPAGE_OWNER_TOKEN }}
+    update-id: ${{ vars.BREWPAGE_ID }}
+```
+
+### Publish a multi-file site (directory)
 
 ```yaml
 - name: Publish Playwright report
@@ -44,29 +92,36 @@ Runs `npx brewpage publish <path>` with your inputs mapped to flags, captures th
   with:
     path: ./playwright-report
     kind: site
+    entry: index.html
 
-- name: Show URL
-  run: echo "Report: ${{ steps.brewpage.outputs.url }}"
+- run: echo "Site live at ${{ steps.brewpage.outputs.url }}"  # on brewpage.app
 ```
 
-Update an existing resource:
+### Publish a single file
 
 ```yaml
-- uses: kochetkov-ma/brewpage-action@v1
+- name: Publish artefact
+  uses: kochetkov-ma/brewpage-action@v1
   with:
-    path: ./playwright-report
-    kind: site
-    update-id: ${{ vars.BREWPAGE_ID }}
-    update-token: ${{ secrets.BREWPAGE_OWNER_TOKEN }}
+    path: ./dist/bundle.zip
+    kind: file
 ```
 
-> Always reference the action by major tag (`@v1`) or an exact `@vX.Y.Z` -- never `@main`.
+> Reference the action by major tag (`@v1`) or an exact `@vX.Y.Z` -- never `@main`. Pin every other `uses:` to an exact version too.
 
-## Links
+## Ecosystem
 
-- BrewPage -- https://brewpage.app
-- OpenAPI contract -- https://github.com/kochetkov-ma/brewpage-openapi
-- CLI -- https://github.com/kochetkov-ma/brewpage-cli (dependency, pre-release)
+- BrewPage -- the platform this action publishes to: <https://brewpage.app>
+- REST API contract / source of truth: <https://github.com/kochetkov-ma/brewpage-openapi>
+
+## Releases (maintainer note)
+
+Versioning is automated:
+
+1. Merges to `main` feed [release-please](https://github.com/googleapis/release-please), which opens/maintains a release PR.
+2. Merging that PR creates the `vX.Y.Z` tag.
+3. `release.yml` builds `dist/`, creates the GitHub Release, moves the major tag `v1` to the new commit so `@v1` consumers pick it up, and updates the Marketplace listing.
+4. The very first Marketplace listing requires a one-time manual acceptance of the Marketplace Terms of Service in the Release UI; subsequent releases publish automatically.
 
 ## License
 

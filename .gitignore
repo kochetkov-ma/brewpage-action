@@ -1,8 +1,11 @@
 node_modules/
-dist/
+coverage/
 *.log
 npm-debug.log*
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Note: dist/ is intentionally NOT ignored. The bundled action entrypoint
+# (dist/index.js) is committed so consumers can run the action directly.
