@@ -6,10 +6,13 @@ name: Check dist
 # bundle from source and fails if the result differs from what is committed.
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: check-dist-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check-dist:

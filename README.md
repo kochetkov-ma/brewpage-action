@@ -1,8 +1,8 @@
 # brewpage-action
 
-Publish CI artefacts -- HTML reports, markdown, multi-file sites (Playwright reports, generated docs, static builds), and single files -- to [BrewPage](https://brewpage.app) from a GitHub workflow. One step, one live URL on [brewpage.app](https://brewpage.app) as a job output.
+[![CI](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/ci.yml/badge.svg)](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/ci.yml) [![check-dist](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/check-dist.yml/badge.svg)](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/check-dist.yml) [![Release](https://img.shields.io/github/v/release/kochetkov-ma/brewpage-action?sort=semver)](https://github.com/kochetkov-ma/brewpage-action/releases) [![Marketplace](https://img.shields.io/badge/Marketplace-Publish%20to%20BrewPage-purple)](https://github.com/marketplace/actions/publish-to-brewpage) [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
-[![Marketplace](https://img.shields.io/badge/marketplace-Publish%20to%20BrewPage-purple)](https://github.com/marketplace/actions/publish-to-brewpage)
+Publish CI artefacts -- HTML reports, markdown, multi-file sites (Playwright reports, generated docs, static builds), and single files -- to [BrewPage](https://brewpage.app) from a GitHub workflow. One step, one live URL on [brewpage.app](https://brewpage.app) as a job output.
 
 ## What it does
 
