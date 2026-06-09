@@ -20,7 +20,7 @@ YAML syntax, metadata, lint, test, build, check-dist sync.
 | 5 | Build | npm run build | dist/index.js created |
 | 6 | check-dist | git diff --exit-code dist/ | dist/ synced with src/ |
 
-Runs on: push main, PRs.
+CI + check-dist run on: pull_request + workflow_dispatch only (NO push trigger, so a tag push fires only release.yml -> no double runs).
 
 ## Release Checks
 

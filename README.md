@@ -116,12 +116,14 @@ Pass the saved `owner-token` plus the `update-id` to update the same resource in
 
 ## Releases (maintainer note)
 
-Versioning is automated:
+Versioning is tag-based:
 
-1. Merges to `main` feed [release-please](https://github.com/googleapis/release-please), which opens/maintains a release PR.
-2. Merging that PR creates the `vX.Y.Z` tag.
-3. `release.yml` builds `dist/`, creates the GitHub Release, moves the major tag `v1` to the new commit so `@v1` consumers pick it up, and updates the Marketplace listing.
+1. Bump the version in `package.json`.
+2. Create an annotated tag and push it: `git tag -a vX.Y.Z -m "..."` then `git push origin main && git push origin vX.Y.Z`.
+3. The tag push triggers `release.yml`: checkout, `npm ci`, lint, test, build, verify the committed `dist/` matches a fresh rebuild (fails on drift), create the GitHub Release ([softprops/action-gh-release](https://github.com/softprops/action-gh-release)), and force-move the major tag `v1` to the released commit so `@v1` consumers auto-update.
 4. The very first Marketplace listing requires a one-time manual acceptance of the Marketplace Terms of Service in the Release UI; subsequent releases publish automatically.
+
+Current releases: `v0.1.0`, `v1.0.0`. `@v1` is the stable consumer ref.
 
 ## License
 

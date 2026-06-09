@@ -1,7 +1,7 @@
 name: Release
 
-# AUTOMATED release. Fires when a semver tag (vX.Y.Z) is pushed -- in practice
-# that tag is created by the release-please PR merge (see release-please.yml).
+# AUTOMATED release. Fires when a semver tag (vX.Y.Z) is pushed. Versioning is
+# tag-based: bump package.json, then `git tag -a vX.Y.Z && git push origin vX.Y.Z`.
 #
 # What this does, hands-off:
 #   1. Rebuild the bundle and FAIL if the committed dist/ drifted (consumers run

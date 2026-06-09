@@ -80,11 +80,11 @@ Follow-up (different repo): record this decision in `brewpage-openapi/ECOSYSTEM-
 
 ## 5. Release / MKT flow
 
-AUTOMATED. Flow:
-- `release-please.yml` (`googleapis/release-please-action`) maintains version from Conventional Commits + opens/maintains a release PR on merge to `main`.
-- Merging that PR → unprefixed semver tag `vX.Y.Z` (e.g. `v1.0.0`). One pkg per REPO → no tag prefix → keeps `@v1` major ref clean for Actions MKT.
-- `release.yml` fires on the `v*` tag → builds, creates the GitHub Release (`softprops/action-gh-release`), auto-moves major tag `v1` to the released commit (force-push), updates the MKT listing.
+TAG-BASED (no release-please, no release PR). Flow:
+- Bump VER in `package.json`. Create annotated tag: `git tag -a vX.Y.Z -m "..."` → `git push origin main && git push origin vX.Y.Z`. Unprefixed semver `vX.Y.Z` (e.g. `v1.0.0`). One pkg per REPO → no tag prefix → keeps `@v1` major ref clean for Actions MKT.
+- Tag push fires `release.yml` → checkout, `npm ci`, lint, test, build, verify committed `dist/` == fresh rebuild (FAILS on drift), creates GitHub Release (`softprops/action-gh-release`), force-moves major tag `v1` to released commit so `@v1` consumers auto-update.
 - Only the FIRST MKT listing needs a one-time manual ToS acceptance in the Release UI; subsequent releases publish automatically.
+- Current RELs: `v0.1.0`, `v1.0.0`. `@v1` = stable consumer ref.
 - MKT metadata REQ in `action.yml`: `name`, `description`, `branding` (cur: `icon: upload-cloud`, `color: purple`). All three mandatory — !=remove.
 
 ## 6. Ecosystem context
@@ -108,7 +108,7 @@ When inputs/outputs change, update ALL THREE in same change:
 2. `README.md` (inputs table, outputs table, usage examples)
 3. `modules/action/README.md` in `brewpage-openapi` REPO (reference snapshot — lists planned inputs/outputs, !=drift). Follow-up (different repo): still needs syncing to the new contract.
 
-**Version pinning — no exceptions.** Every `package.json` dep pinned exact (`X.Y.Z`, no `^`/`~`); every WF `uses:` pinned exact `vX.Y.Z`. Forbidden: `@latest`, floating major shorthand `@v4`, `@main`. Current WF pins: `actions/checkout@v6.0.3`, `actions/setup-node@v6.4.0`, `softprops/action-gh-release@v3.0.0`, `googleapis/release-please-action@v5.0.0`, `actions/upload-artifact@v7.0.1`. (Consumers may still ref ACT as `@v1` — published major-tag contract, separate from how THIS REPO pins its own deps.)
+**Version pinning — no exceptions.** Every `package.json` dep pinned exact (`X.Y.Z`, no `^`/`~`); every WF `uses:` pinned exact `vX.Y.Z`. Forbidden: `@latest`, floating major shorthand `@v4`, `@main`. Current WF pins: `actions/checkout@v6.0.3`, `actions/setup-node@v6.4.0`, `softprops/action-gh-release@v3.0.0`, `actions/upload-artifact@v7.0.1`. (Consumers may still ref ACT as `@v1` — published major-tag contract, separate from how THIS REPO pins its own deps.)
 
 **Commit `dist/`.** The node24 ACT runs the committed bundle, not source. Every change to `src/` → `npm run build` → commit `dist/`. `check-dist.yml` CI rebuilds and fails on `git diff --exit-code dist/` drift, so a stale bundle never ships.
 
@@ -129,11 +129,13 @@ npm run build && git diff --exit-code dist/
 # Validate action.yml is well-formed YAML (CI does this):
 npx --yes js-yaml action.yml > /dev/null
 
-# Release (AUTOMATED): merge the release-please PR on main; that pushes tag vX.Y.Z,
-# which triggers release.yml (GitHub Release + major-tag move + MKT update).
+# Release (TAG-BASED): bump package.json VER, then:
+git tag -a vX.Y.Z -m "..." && git push origin main && git push origin vX.Y.Z
+# Tag push triggers release.yml (npm ci + lint + test + build + dist/ drift check
+# + GitHub Release + force-move major tag v1).
 ```
 
-CI: `ci.yml` (npm ci + lint + test + build + js-yaml validation), `check-dist.yml` (rebuild + dist/ drift guard), `release-please.yml` (Conventional-Commits version + release PR), `release.yml` (tag-driven GitHub Release + major-tag move + MKT publish).
+CI (runs on `pull_request` + `workflow_dispatch` only — NO push trigger): `ci.yml` (npm ci + lint + test + build + js-yaml validation), `check-dist.yml` (rebuild + dist/ drift guard). `release.yml` fires on `v*` tag push (build + dist/ drift check + GitHub Release + major-tag move + MKT publish).
 
 ## Links
 

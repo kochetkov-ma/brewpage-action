@@ -26,7 +26,7 @@ Node24 action (runs.using: node24, main: dist/index.js) with REST API publish.
 |---|------|
 | 1 | Keep action.yml, README.md, CLAUDE.md in sync. Update all three together |
 | 2 | Each input: req/default/description. Each output: core.setOutput(key, value) |
-| 3 | Validate owner-token + update-id pair. One without other = fail fast |
+| 3 | owner-token + update-id both set -> PUT update; otherwise POST create |
 
 ## Versions
 

@@ -31,7 +31,7 @@ Direct REST API (POST /api/html, /api/files, /api/sites) via native fetch, no CL
 | # | Rule |
 |---|------|
 | 1 | Keep action.yml, README.md, CLAUDE.md in sync |
-| 2 | Validate owner-token + update-id pair. One without other = error |
+| 2 | owner-token + update-id both set -> PUT update; otherwise POST create |
 | 3 | Outputs: url, owner-token (masked), id via core.setOutput() |
 
 ## Hard Rules

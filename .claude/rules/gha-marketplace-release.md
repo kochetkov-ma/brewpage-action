@@ -35,5 +35,6 @@ Tag vX.Y.Z → CI builds dist/ + creates Release + auto-moves v1 + Marketplace p
 ## Commands
 
 ```bash
-git tag vX.Y.Z && git push --follow-tags
+# ANNOTATED tag. `git push --follow-tags` skips lightweight tags -> release.yml never fires.
+git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin main && git push origin vX.Y.Z
 ```
