@@ -181,6 +181,18 @@ async function resolveTargetId(
     return undefined
   }
 
+  // Files are immutable (no PUT for /api/files): never discover, always create.
+  // mode=update must fail loudly rather than silently creating a second file.
+  if (kind === 'file') {
+    if (mode === 'update') {
+      throw new Error(
+        'mode=update is not supported for file artefacts: files are immutable and ' +
+          'cannot be updated in place. Use mode=create (a new resource is published each run).'
+      )
+    }
+    return undefined
+  }
+
   if (mode === 'auto' || mode === 'update') {
     const discovery = await discoverOwnResource(
       baseUrl,
@@ -189,13 +201,13 @@ async function resolveTargetId(
       kind
     )
     if (discovery.status === 'found') {
+      if (discovery.ambiguous === true) {
+        core.warning(
+          `Multiple ${kind} resources found in namespace "${namespace}"; updating the oldest one. ` +
+            'Pass update-id to target a specific resource.'
+        )
+      }
       return discovery.id
-    }
-    if (discovery.status === 'ambiguous') {
-      core.warning(
-        `Multiple ${kind} resources found in namespace "${namespace}"; cannot auto-select one. ` +
-          'Pass update-id to target a specific resource. Creating a new resource instead.'
-      )
     }
     if (mode === 'update') {
       throw new Error(
@@ -258,6 +270,7 @@ async function publish(args: PublishArgs): Promise<Result> {
           ns: namespace,
           id: updateId,
           ttl,
+          format: kind === 'markdown' ? 'markdown' : 'html',
           ownerToken
         }),
         'updated'

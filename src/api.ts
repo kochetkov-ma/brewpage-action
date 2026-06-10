@@ -48,16 +48,17 @@ interface GalleryPage {
 // Discovery kind for matching gallery items to an artefact kind.
 export type DiscoverKind = 'html' | 'markdown' | 'site' | 'file'
 
-// 'ambiguous' signals that several items matched ns+kind: the caller should warn
-// and fall back to creating, since auto-update cannot pick a single target safely.
+// 'found' carries the id to update. When several items matched ns+kind the oldest
+// (most stable) is chosen and `ambiguous` is set so the caller can warn the user.
 export type DiscoverResult =
-  | { status: 'found'; id: string }
+  | { status: 'found'; id: string; ambiguous?: boolean }
   | { status: 'none' }
-  | { status: 'ambiguous' }
   | { status: 'unavailable' }
 
 const USER_AGENT = 'brewpage-action'
 const GALLERY_PAGE_SIZE = 100
+// Safety bound so a misbehaving backend (e.g. never-shrinking pages) cannot loop forever.
+const GALLERY_MAX_PAGES = 50
 
 function matchesKind(type: string, kind: DiscoverKind): boolean {
   const normalized = type.toLowerCase()
@@ -84,9 +85,8 @@ export async function discoverOwnResource(
   kind: DiscoverKind
 ): Promise<DiscoverResult> {
   const matches: GalleryItem[] = []
-  let page = 0
   try {
-    for (;;) {
+    for (let page = 0; page < GALLERY_MAX_PAGES; page += 1) {
       const url = buildUrl(baseUrl, '/api/gallery', {
         mine: 'true',
         size: GALLERY_PAGE_SIZE,
@@ -109,11 +109,10 @@ export async function discoverOwnResource(
           matches.push(item)
         }
       }
-      const seen = (page + 1) * GALLERY_PAGE_SIZE
-      if (seen >= body.total || items.length === 0) {
+      // A short or empty page is the last page; do not rely on body.total.
+      if (items.length < GALLERY_PAGE_SIZE || items.length === 0) {
         break
       }
-      page += 1
     }
   } catch {
     return { status: 'unavailable' }
@@ -122,10 +121,23 @@ export async function discoverOwnResource(
   if (matches.length === 0) {
     return { status: 'none' }
   }
-  if (matches.length > 1) {
-    return { status: 'ambiguous' }
+  if (matches.length === 1) {
+    return { status: 'found', id: matches[0].id }
   }
-  return { status: 'found', id: matches[0].id }
+  // Several matched: pick the oldest by createdAt for a stable, repeatable target.
+  // Missing timestamps sort last (Infinity); a stable sort keeps input order for ties.
+  const oldest = matches
+    .map((item, index) => ({ item, index, ts: toTimestamp(item.createdAt) }))
+    .sort((a, b) => a.ts - b.ts || a.index - b.index)[0].item
+  return { status: 'found', id: oldest.id, ambiguous: true }
+}
+
+function toTimestamp(createdAt: string | undefined): number {
+  if (createdAt === undefined) {
+    return Number.POSITIVE_INFINITY
+  }
+  const parsed = Date.parse(createdAt)
+  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed
 }
 
 function trimBase(baseUrl: string): string {
@@ -212,7 +224,9 @@ export async function postHtml(
 }
 
 // PUT /api/html/{ns}/{id}: replace page content at the same URL. Owner token required;
-// tags/password/format/showTopBar are immutable on update.
+// tags/password/showTopBar are immutable on update. The backend re-infers the stored
+// format from the request, so both the Content-Type and an explicit &format= are sent
+// to keep a markdown resource markdown (and html html) instead of flipping it.
 export async function putHtml(
   baseUrl: string,
   options: {
@@ -220,16 +234,19 @@ export async function putHtml(
     ns: string
     id: string
     ttl?: number
+    format: HtmlFormat
     ownerToken: string
   }
 ): Promise<UpdateResponse> {
   const url = buildUrl(baseUrl, `/api/html/${options.ns}/${options.id}`, {
-    ttl: options.ttl
+    ttl: options.ttl,
+    format: options.format
   })
   const response = await fetch(url, {
     method: 'PUT',
     headers: {
-      'Content-Type': 'text/html',
+      'Content-Type':
+        options.format === 'markdown' ? 'text/markdown' : 'text/html',
       'X-Owner-Token': options.ownerToken
     },
     body: options.body

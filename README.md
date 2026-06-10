@@ -41,9 +41,11 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 
 ## Usage
 
-### First publish (no owner token)
+Four ways to publish, simplest first. All examples reference the action as `kochetkov-ma/brewpage-action@v1`.
 
-On the first run leave `owner-token` empty. The action mints a token and prints it in the job summary. Read the `owner-token` output and store it as a repo secret so future runs can update the same resource.
+### 1. Just publish (simplest, one-off)
+
+Use this for a quick one-off preview. You pass only `path` (and optionally `kind`). No owner token.
 
 ```yaml
 - name: Publish HTML report
@@ -51,32 +53,27 @@ On the first run leave `owner-token` empty. The action mints a token and prints 
   uses: kochetkov-ma/brewpage-action@v1
   with:
     path: ./report.html
-    kind: html
 
-- name: Show live URL
-  run: echo "Published to ${{ steps.brewpage.outputs.url }}"
-
-# Persist the minted owner token to a repo secret (one-time).
-# Requires a token with secrets:write, e.g. a fine-grained PAT in GH_PAT.
-- name: Save owner token as a secret
-  env:
-    GH_TOKEN: ${{ secrets.GH_PAT }}
-    OWNER_TOKEN: ${{ steps.brewpage.outputs.owner-token }}
-    RESOURCE_ID: ${{ steps.brewpage.outputs.id }}
-  run: |
-    gh secret set BREWPAGE_OWNER_TOKEN --body "$OWNER_TOKEN"
-    gh variable set BREWPAGE_ID --body "$RESOURCE_ID"
+- run: echo "Published to ${{ steps.brewpage.outputs.url }}"  # on brewpage.app
 ```
 
-> The minted `owner-token` is the only credential that can manage, update, or delete the resource on [brewpage.app](https://brewpage.app). Losing it makes the resource unmanageable. Copy it from the job summary if you do not automate the secret step above.
+**Requests made:** `GET /api/owner-token` (mints a fresh token), then a `POST` create (`/api/html`, `/api/sites`, or `/api/files` depending on kind).
 
-### Full-auto redeploy (mint once, then just `path:`)
+**What happens:** a brand-new resource and URL are created on [brewpage.app](https://brewpage.app) on every run. The freshly minted `owner-token` is shown in the job summary and exposed as the `owner-token` output. If you want to keep updating the same URL later, save that token -- see the next scenario.
 
-With `mode: auto` (the default) and a persisted `owner-token`, the action keeps a single stable URL on [brewpage.app](https://brewpage.app) across runs. No `update-id` bookkeeping: on each run it discovers your existing resource via the owner gallery and PUTs over it; the first run creates it.
+### 2. Generate an owner token once (setup for reuse)
 
-**Step 1 -- mint an owner token once and save it as a secret.**
+This is the one-time prerequisite for scenarios 3 and 4. It is not an action call of its own -- just get a token and store it as the repo secret `BREWPAGE_OWNER_TOKEN`. The `owner-token` is the only credential that can update or delete the resource on [brewpage.app](https://brewpage.app); lose it and the resource is unmanageable.
 
-Either let the first run mint it and read the `owner-token` output (also shown in the job summary):
+**Option A -- mint a token directly and paste it into a secret:**
+
+```bash
+curl -fsS https://brewpage.app/api/owner-token
+# Copy the token, then in your repo: Settings -> Secrets -> New secret
+#   Name: BREWPAGE_OWNER_TOKEN   Value: <the token>
+```
+
+**Option B -- run scenario 1 once and persist the `owner-token` output.** This `gh secret set` needs a token with `secrets:write` (e.g. a fine-grained PAT in `GH_PAT`):
 
 ```yaml
 - name: First publish (mints the token)
@@ -85,7 +82,6 @@ Either let the first run mint it and read the `owner-token` output (also shown i
   with:
     path: ./report.html
 
-# Requires a token with secrets:write, e.g. a fine-grained PAT in GH_PAT.
 - name: Persist owner token as a secret
   env:
     GH_TOKEN: ${{ secrets.GH_PAT }}
@@ -93,13 +89,28 @@ Either let the first run mint it and read the `owner-token` output (also shown i
   run: gh secret set BREWPAGE_OWNER_TOKEN --body "$OWNER_TOKEN"
 ```
 
-Or mint one directly against [brewpage.app](https://brewpage.app) and paste it into a repo secret (`BREWPAGE_OWNER_TOKEN`):
+### 3. Redeploy to a known resource (fastest -- one request)
 
-```bash
-curl -fsS https://brewpage.app/api/owner-token
+Use this when you already created the resource (manually or in an earlier run) and know its `namespace` and `id`. This is the most efficient redeploy. You pass `owner-token` + `namespace` + `update-id`.
+
+```yaml
+- name: Redeploy report
+  id: brewpage
+  uses: kochetkov-ma/brewpage-action@v1
+  with:
+    path: ./report.html
+    owner-token: ${{ secrets.BREWPAGE_OWNER_TOKEN }}
+    namespace: my-namespace
+    update-id: ${{ vars.BREWPAGE_ID }}
 ```
 
-**Step 2 -- pass the secret as `owner-token` and just `path:`.** Every later run auto-PUTs the same site at the same URL:
+**Requests made:** exactly one -- `PUT /api/{html|sites}/{ns}/{id}` with header `X-Owner-Token`. No mint, no gallery discovery (`update-id` short-circuits everything).
+
+**What happens:** the content is replaced in place at the same URL on [brewpage.app](https://brewpage.app). The `owner-token` must own the resource (otherwise `403`), and `ns`+`id` must already exist (otherwise `404` -- `PUT` does not create). Files are immutable: `kind: file` has no `PUT`, so a new resource is created instead.
+
+### 4. Full-auto redeploy (most automatic, one extra request)
+
+Use this when you just want "publish and keep one stable URL" without tracking the id. This is the default `mode: auto`. You pass `owner-token` + `path`; `namespace` is optional and defaults to a deterministic per-repo slug (derived from `github.repository`).
 
 ```yaml
 - name: Publish (auto-republish)
@@ -112,7 +123,9 @@ curl -fsS https://brewpage.app/api/owner-token
 - run: echo "Stable URL: ${{ steps.brewpage.outputs.url }}"
 ```
 
-Discovery uses the public/owner gallery on [brewpage.app](https://brewpage.app) and is scoped to the deterministic per-repo `namespace` (derived from `github.repository`) plus the artefact `kind`, so each repo+kind maps to its own resource. `update-id` still wins when supplied. Files are immutable: a `file` artefact is always created, never updated in place.
+**Requests made:** `GET /api/gallery?mine=true` with header `X-Owner-Token` (discovers your resource by namespace+kind), then `PUT` if one is found, or a `POST` create on the first run.
+
+**What happens:** the first run finds nothing and creates the resource; every later run finds it and `PUT`s over it -- same URL on [brewpage.app](https://brewpage.app). If several resources match the same namespace+kind, it updates the oldest and warns (pass `update-id`, scenario 3, to be explicit). Files always create (immutable). A freshly minted token skips discovery.
 
 ```
   mint owner-token once          (GET /api/owner-token, or read run #1 output)
@@ -126,20 +139,6 @@ Discovery uses the public/owner gallery on [brewpage.app](https://brewpage.app) 
             |
             v
                             -----> PUT same resource (URL unchanged)
-```
-
-### Redeploy / update an existing resource
-
-Prefer full-auto redeploy above. To target a specific resource explicitly, pass the saved `owner-token` plus the `update-id` to update it in place (PUT) instead of creating a new one. `update-id` takes precedence over `mode` auto-discovery.
-
-```yaml
-- name: Redeploy report
-  uses: kochetkov-ma/brewpage-action@v1
-  with:
-    path: ./report.html
-    kind: html
-    owner-token: ${{ secrets.BREWPAGE_OWNER_TOKEN }}
-    update-id: ${{ vars.BREWPAGE_ID }}
 ```
 
 ### Publish a multi-file site (directory)
@@ -182,7 +181,7 @@ Versioning is tag-based:
 3. The tag push triggers `release.yml`: checkout, `npm ci`, lint, test, build, verify the committed `dist/` matches a fresh rebuild (fails on drift), create the GitHub Release ([softprops/action-gh-release](https://github.com/softprops/action-gh-release)), and force-move the major tag `v1` to the released commit so `@v1` consumers auto-update.
 4. The very first Marketplace listing requires a one-time manual acceptance of the Marketplace Terms of Service in the Release UI; subsequent releases publish automatically.
 
-Current releases: `v0.1.0`, `v1.0.0`. `@v1` is the stable consumer ref.
+Latest release: `v1.1.0` (full-auto republish). `@v1` is the stable consumer ref and tracks the latest `v1.x`.
 
 ## License
 

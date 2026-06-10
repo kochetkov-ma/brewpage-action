@@ -258,9 +258,9 @@ describe('run() - mode=auto with discovery none or unavailable falls back to POS
   })
 })
 
-// --- mode=auto + discovery ambiguous -> warning + POST -----------------------
+// --- mode=auto + multiple matches -> warning + PUT oldest --------------------
 
-describe('run() - mode=auto with discovery ambiguous', () => {
+describe('run() - mode=auto with multiple matching resources', () => {
   beforeEach(() => {
     process.env.GITHUB_REPOSITORY = 'kochetkov-ma/brewpage-action'
   })
@@ -269,14 +269,14 @@ describe('run() - mode=auto with discovery ambiguous', () => {
     delete process.env.GITHUB_REPOSITORY
   })
 
-  // GIVEN mode=auto, gallery returns two matching items
+  // GIVEN mode=auto, gallery returns two matching items with distinct createdAt
   // WHEN run() is called
-  // THEN core.warning is emitted and POST create is used
+  // THEN core.warning is emitted and PUT updates the oldest (no new resource created)
 
-  it('emits core.warning and falls back to POST when discovery is ambiguous', async () => {
+  it('warns and PUTs the oldest resource when multiple match', async () => {
     const items = [
-      { id: 'id1', namespace: 'public', type: 'html' },
-      { id: 'id2', namespace: 'public', type: 'html' }
+      { id: 'newer', namespace: 'public', type: 'html', createdAt: '2026-04-01T00:00:00Z' },
+      { id: 'older', namespace: 'public', type: 'html', createdAt: '2026-01-01T00:00:00Z' }
     ]
     setInputs({
       path: 'report.html',
@@ -287,7 +287,7 @@ describe('run() - mode=auto with discovery ambiguous', () => {
     })
     global.fetch = makeFetchMockWithResponse(
       makeResponse(true, 200, galleryPage(items, 2)),
-      makeResponse(true, 200, CREATE_RESPONSE)
+      makeResponse(true, 200, UPDATE_RESPONSE)
     )
 
     await run()
@@ -296,15 +296,16 @@ describe('run() - mode=auto with discovery ambiguous', () => {
       expect.stringContaining('Multiple')
     )
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
-    const [postUrl, postInit] = fetchMock.mock.calls[1] as [string, RequestInit]
-    expect(postUrl).toMatch(/\/api\/html/)
-    expect(postInit.method).toEqual('POST')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const [putUrl, putInit] = fetchMock.mock.calls[1] as [string, RequestInit]
+    expect(putUrl).toMatch(/\/api\/html\/public\/older/)
+    expect(putInit.method).toEqual('PUT')
   })
 })
 
-// --- mode=auto + file kind + discovery found -> warning + POST ---------------
+// --- mode=auto + file kind -> skip discovery, POST directly ------------------
 
-describe('run() - mode=auto file kind is immutable', () => {
+describe('run() - mode=auto file kind skips discovery', () => {
   beforeEach(() => {
     process.env.GITHUB_REPOSITORY = 'kochetkov-ma/brewpage-action'
   })
@@ -313,12 +314,11 @@ describe('run() - mode=auto file kind is immutable', () => {
     delete process.env.GITHUB_REPOSITORY
   })
 
-  // GIVEN mode=auto, file kind, discovery finds an existing file resource
+  // GIVEN mode=auto and file kind with an existing owner token
   // WHEN run() is called
-  // THEN core.warning about immutability is emitted and POST create is used
+  // THEN no gallery fetch happens and POST /api/files is called exactly once
 
-  it('emits immutability warning and calls POST when file kind discovery found', async () => {
-    const galleryItem = { id: 'file-id', namespace: 'public', type: 'file' }
+  it('does not query the gallery and POSTs the file directly', async () => {
     setInputs({
       path: 'artifact.bin',
       kind: 'file',
@@ -327,20 +327,116 @@ describe('run() - mode=auto file kind is immutable', () => {
       'ttl-days': '15',
       mode: 'auto'
     })
-    global.fetch = makeFetchMockWithResponse(
-      makeResponse(true, 200, galleryPage([galleryItem], 1)),
-      makeResponse(true, 200, CREATE_RESPONSE)
-    )
+    global.fetch = makeFetchMock(CREATE_RESPONSE)
 
     await run()
 
-    expect(mockCore.warning).toHaveBeenCalledWith(
-      expect.stringContaining('immutable')
-    )
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
-    const [postUrl, postInit] = fetchMock.mock.calls[1] as [string, RequestInit]
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [postUrl, postInit] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(postUrl).toMatch(/\/api\/files/)
     expect(postInit.method).toEqual('POST')
+  })
+})
+
+// --- mode=update + file kind -> throws ---------------------------------------
+
+describe('run() - mode=update file kind fails loudly', () => {
+  beforeEach(() => {
+    process.env.GITHUB_REPOSITORY = 'kochetkov-ma/brewpage-action'
+  })
+
+  afterEach(() => {
+    delete process.env.GITHUB_REPOSITORY
+  })
+
+  // GIVEN mode=update with a file kind and no update-id
+  // WHEN run() is called
+  // THEN setFailed reports that files cannot be updated and no fetch is attempted
+
+  it('calls setFailed and never fetches when mode=update with file kind', async () => {
+    setInputs({
+      path: 'artifact.bin',
+      kind: 'file',
+      'owner-token': 'existing-tok',
+      namespace: 'public',
+      'ttl-days': '15',
+      mode: 'update'
+    })
+    global.fetch = makeFetchMock(CREATE_RESPONSE)
+
+    await run()
+
+    expect(mockCore.setFailed).toHaveBeenCalledWith(
+      expect.stringContaining('files are immutable')
+    )
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    expect(fetchMock).toHaveBeenCalledTimes(0)
+  })
+})
+
+// --- markdown PUT: content-type + format query -------------------------------
+
+describe('run() - markdown update sends markdown content-type and format query', () => {
+  beforeEach(() => {
+    process.env.GITHUB_REPOSITORY = 'kochetkov-ma/brewpage-action'
+  })
+
+  afterEach(() => {
+    delete process.env.GITHUB_REPOSITORY
+  })
+
+  // GIVEN an explicit update-id with kind=markdown
+  // WHEN run() is called
+  // THEN PUT uses Content-Type text/markdown and the URL carries format=markdown
+
+  it('PUTs markdown with text/markdown content-type and format=markdown query', async () => {
+    setInputs({
+      path: 'doc.md',
+      kind: 'markdown',
+      'owner-token': 'existing-tok',
+      'update-id': 'md001',
+      namespace: 'public',
+      'ttl-days': '15'
+    })
+    global.fetch = makeFetchMock(UPDATE_RESPONSE)
+
+    await run()
+
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toMatch(/\/api\/html\/public\/md001/)
+    expect(url).toContain('format=markdown')
+    expect(init.method).toEqual('PUT')
+    expect((init.headers as Record<string, string>)['Content-Type']).toEqual(
+      'text/markdown'
+    )
+  })
+
+  // GIVEN an explicit update-id with kind=html
+  // WHEN run() is called
+  // THEN PUT uses Content-Type text/html and the URL carries format=html
+
+  it('PUTs html with text/html content-type and format=html query', async () => {
+    setInputs({
+      path: 'report.html',
+      kind: 'html',
+      'owner-token': 'existing-tok',
+      'update-id': 'h001',
+      namespace: 'public',
+      'ttl-days': '15'
+    })
+    global.fetch = makeFetchMock(UPDATE_RESPONSE)
+
+    await run()
+
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain('format=html')
+    expect((init.headers as Record<string, string>)['Content-Type']).toEqual(
+      'text/html'
+    )
   })
 })
 
