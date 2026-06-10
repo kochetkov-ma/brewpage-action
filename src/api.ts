@@ -28,6 +28,106 @@ export interface OwnerToken {
 
 export type HtmlFormat = 'html' | 'markdown'
 
+export interface GalleryItem {
+  id: string
+  type: string
+  title?: string
+  createdAt?: string
+  views?: number
+  visibility?: string
+  namespace: string
+}
+
+interface GalleryPage {
+  items: GalleryItem[]
+  total: number
+  page: number
+  size: number
+}
+
+// Discovery kind for matching gallery items to an artefact kind.
+export type DiscoverKind = 'html' | 'markdown' | 'site' | 'file'
+
+// 'ambiguous' signals that several items matched ns+kind: the caller should warn
+// and fall back to creating, since auto-update cannot pick a single target safely.
+export type DiscoverResult =
+  | { status: 'found'; id: string }
+  | { status: 'none' }
+  | { status: 'ambiguous' }
+  | { status: 'unavailable' }
+
+const USER_AGENT = 'brewpage-action'
+const GALLERY_PAGE_SIZE = 100
+
+function matchesKind(type: string, kind: DiscoverKind): boolean {
+  const normalized = type.toLowerCase()
+  switch (kind) {
+    case 'site':
+      return normalized === 'site'
+    case 'html':
+      return normalized === 'html'
+    case 'markdown':
+      return normalized === 'markdown' || normalized === 'md'
+    case 'file':
+      return normalized === 'file'
+  }
+}
+
+// GET /api/gallery?mine=true: list the caller's own publications (all kinds and
+// namespaces, including private) and resolve the single resource matching ns+kind.
+// Returns the id to update, or a non-found signal so the caller can create instead.
+// Any non-2xx response or network failure is reported as 'unavailable'.
+export async function discoverOwnResource(
+  baseUrl: string,
+  ownerToken: string,
+  ns: string,
+  kind: DiscoverKind
+): Promise<DiscoverResult> {
+  const matches: GalleryItem[] = []
+  let page = 0
+  try {
+    for (;;) {
+      const url = buildUrl(baseUrl, '/api/gallery', {
+        mine: 'true',
+        size: GALLERY_PAGE_SIZE,
+        page
+      })
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-Owner-Token': ownerToken,
+          'User-Agent': USER_AGENT
+        }
+      })
+      if (!response.ok) {
+        return { status: 'unavailable' }
+      }
+      const body = (await response.json()) as GalleryPage
+      const items = Array.isArray(body.items) ? body.items : []
+      for (const item of items) {
+        if (item.namespace === ns && matchesKind(item.type, kind)) {
+          matches.push(item)
+        }
+      }
+      const seen = (page + 1) * GALLERY_PAGE_SIZE
+      if (seen >= body.total || items.length === 0) {
+        break
+      }
+      page += 1
+    }
+  } catch {
+    return { status: 'unavailable' }
+  }
+
+  if (matches.length === 0) {
+    return { status: 'none' }
+  }
+  if (matches.length > 1) {
+    return { status: 'ambiguous' }
+  }
+  return { status: 'found', id: matches[0].id }
+}
+
 function trimBase(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, '')
 }

@@ -33,7 +33,7 @@ Backend (Spring/Kotlin), frontend, infra: NOT in any of these REPOs. SPEC is the
 
 `runs.using: node24`, `main: dist/index.js` — single committed bundle (Rollup). No Docker image, no composite bash steps. TS source in `src/`, runtime dep `@actions/core` only; HTTP via native `fetch`/`FormData`/`Blob` (Node 24 undici).
 
-Flow: `inputs → mint-or-reuse OT (setSecret) → detect kind + resolve NS → route create (POST) | update (PUT) → outputs + job summary`
+Flow: `inputs → mint-or-reuse OT (setSecret) → detect kind + resolve NS → resolve target id (mode + discovery) → route create (POST) | update (PUT) → outputs + job summary`
 
 ### Inputs (keep in lockstep with `action.yml`)
 
@@ -45,14 +45,20 @@ Flow: `inputs → mint-or-reuse OT (setSecret) → detect kind + resolve NS → 
 | `password` | no | _(empty)_ | Set → resource private (hidden from gallery). |
 | `ttl-days` | no | `15` | TTL in days (1..30). |
 | `tags` | no | _(empty)_ | Comma-separated tags. |
-| `owner-token` | no | _(empty)_ | OT for the resource. Empty auto-mints one (surfaced in job summary). |
-| `update-id` | no | _(empty)_ | Id of existing resource. With `owner-token` → updates via PUT. |
+| `owner-token` | no | _(empty)_ | OT for the resource. Empty auto-mints one (surfaced in job summary; persist as secret for redeploys). |
+| `mode` | no | `auto` | `auto` \| `create` \| `update`. `auto` = discover-by-owner then PUT-else-POST; `create` always POST; `update` requires resolvable existing resource else fails. |
+| `update-id` | no | _(empty)_ | Id of existing resource. With `owner-token` → explicit PUT. Takes precedence over `mode` auto-discovery. |
 | `entry` | no | _(empty)_ | Site entry file override (default `index.html`). |
 | `show-top-bar` | no | _(empty)_ | HTML only: toggle the BP toolbar. |
 | `brewpage-url` | no | _(empty)_ | API base URL override. Empty = `https://brewpage.app`. |
 | `fail-on-error` | no | `true` | When `false`, warn instead of failing the step on error. |
 
-Update routing handled in TS (`src/main.ts`): `owner-token` + `update-id` present → PUT (update existing); else POST (create new).
+Update routing handled in TS (`src/main.ts`, `resolveTargetId` + `publish`):
+- **Target-id resolution.** `update-id` set → use it (always wins). `mode=create` → no target (POST). `mode=auto` + freshly minted OT → skip discovery (new token owns nothing → POST). `mode=auto`|`update` with a persisted OT → discover-by-owner. `mode=update` with no resolvable id → fail fast.
+- **Discover-by-owner.** `discoverOwnResource` calls `GET /api/gallery?mine=true` (OT-scoped), filters to the resolved NS + artefact kind. Exactly one match → its id (→ PUT). Zero → POST create. Ambiguous (>1) → warn + POST create (caller must pass `update-id` to disambiguate).
+- **PUT vs POST.** Resolved target id present → PUT (`putSite` / `putHtml`); else POST (`postSite` / `postHtml` / `postFile`).
+- **Files immutable.** No PUT for `/api/files`; a `file` artefact always creates a new resource even if a target id was resolved (warns).
+- **NS scope.** Discovery is bounded by the deterministic per-repo NS (from `github.repository`) + kind, so each repo+kind maps to its own auto-republished resource.
 
 ### Outputs (keep in lockstep with `action.yml`)
 

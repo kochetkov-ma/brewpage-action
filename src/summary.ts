@@ -8,6 +8,7 @@ export interface SummaryData {
   expiresAt?: string
   ownerToken: string
   minted: boolean
+  action: 'created' | 'updated'
 }
 
 // Render the job summary to $GITHUB_STEP_SUMMARY: the live URL, resource metadata,
@@ -18,7 +19,13 @@ export async function buildSummary(
 ): Promise<void> {
   const summary = coreModule.summary
 
+  const headline =
+    data.action === 'updated'
+      ? 'Updated existing resource on BrewPage'
+      : 'Created resource on BrewPage'
+
   summary.addHeading('Published to BrewPage', 2)
+  summary.addRaw(headline, true)
   summary.addLink(data.link, data.link)
 
   summary.addTable([

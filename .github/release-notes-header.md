@@ -5,7 +5,7 @@ Marketplace: https://github.com/marketplace/actions/publish-to-brewpage
 ### Quick start
 
 ```yaml
-- uses: kochetkov-ma/brewpage-action@v1
+- uses: kochetkov-ma/brewpage-action@__TAG__
   id: publish
   with:
     path: ./report.html

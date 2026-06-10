@@ -202,7 +202,7 @@ describe('run() - routing: create (POST)', () => {
   // THEN POST /api/html is called
 
   it('calls POST /api/html for html kind without update-id', async () => {
-    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15' })
+    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15', mode: 'create' })
     global.fetch = makeFetchMock(CREATE_RESPONSE)
 
     await run()
@@ -215,7 +215,7 @@ describe('run() - routing: create (POST)', () => {
   })
 
   it('calls POST /api/sites for site kind without update-id', async () => {
-    setInputs({ path: 'dist/', 'kind': 'site', 'owner-token': 'tok', 'ttl-days': '15' })
+    setInputs({ path: 'dist/', 'kind': 'site', 'owner-token': 'tok', 'ttl-days': '15', mode: 'create' })
     global.fetch = makeFetchMock(CREATE_RESPONSE)
 
     await run()
@@ -228,7 +228,7 @@ describe('run() - routing: create (POST)', () => {
   })
 
   it('calls POST /api/files for file kind without update-id', async () => {
-    setInputs({ path: 'artifact.bin', 'kind': 'file', 'owner-token': 'tok', 'ttl-days': '15' })
+    setInputs({ path: 'artifact.bin', 'kind': 'file', 'owner-token': 'tok', 'ttl-days': '15', mode: 'create' })
     global.fetch = makeFetchMock(CREATE_RESPONSE)
 
     await run()
@@ -332,7 +332,7 @@ describe('run() - outputs', () => {
   // THEN setOutput is called for all 6 output keys with values from the response
 
   it('sets all required outputs from the API response', async () => {
-    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15', namespace: 'public' })
+    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15', namespace: 'public', mode: 'create' })
     global.fetch = makeFetchMock(CREATE_RESPONSE)
 
     await run()
@@ -352,7 +352,7 @@ describe('run() - outputs', () => {
       link: 'https://brewpage.app/public/res002',
       ownerLink: 'https://brewpage.app/public/res002?owner=1'
     }
-    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15', namespace: 'public' })
+    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15', namespace: 'public', mode: 'create' })
     global.fetch = makeFetchMock(responseWithoutExpiry)
 
     await run()
@@ -377,7 +377,7 @@ describe('run() - summary content', () => {
   // THEN summary.addLink is called with the live URL
 
   it('adds the live URL to the summary', async () => {
-    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15', namespace: 'public' })
+    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15', namespace: 'public', mode: 'create' })
     global.fetch = makeFetchMock(CREATE_RESPONSE)
 
     await run()
@@ -403,7 +403,7 @@ describe('run() - summary content', () => {
   })
 
   it('does not add persist-token notice when owner-token was provided by caller', async () => {
-    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15', namespace: 'public' })
+    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15', namespace: 'public', mode: 'create' })
     global.fetch = makeFetchMock(CREATE_RESPONSE)
 
     await run()
@@ -432,7 +432,7 @@ describe('run() - fail-on-error', () => {
   // THEN core.setFailed is called with the error message
 
   it('calls setFailed when fetch throws and fail-on-error is default', async () => {
-    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15' })
+    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15', mode: 'create' })
     const fetchMock = jest.fn() as jest.MockedFunction<typeof fetch>
     fetchMock.mockRejectedValueOnce(new Error('network error'))
     global.fetch = fetchMock
@@ -443,7 +443,7 @@ describe('run() - fail-on-error', () => {
   })
 
   it('calls warning instead of setFailed when fail-on-error is false', async () => {
-    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15', 'fail-on-error': 'false' })
+    setInputs({ path: 'report.html', 'owner-token': 'tok', 'ttl-days': '15', 'fail-on-error': 'false', mode: 'create' })
     const fetchMock = jest.fn() as jest.MockedFunction<typeof fetch>
     fetchMock.mockRejectedValueOnce(new Error('network error'))
     global.fetch = fetchMock
@@ -475,6 +475,7 @@ describe('run() - brewpage-url override', () => {
       path: 'report.html',
       'owner-token': 'tok',
       'ttl-days': '15',
+      mode: 'create',
       'brewpage-url': 'https://staging.brewpage.app'
     })
     global.fetch = makeFetchMock(CREATE_RESPONSE)

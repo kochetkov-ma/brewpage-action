@@ -1,6 +1,7 @@
 import * as core from '@actions/core'
 
 import {
+  discoverOwnResource,
   mintToken,
   postFile,
   postHtml,
@@ -18,6 +19,15 @@ const DEFAULT_BASE_URL = 'https://brewpage.app'
 const MIN_TTL = 1
 const MAX_TTL = 30
 
+type Mode = 'auto' | 'create' | 'update'
+
+function parseMode(raw: string): Mode {
+  if (raw === 'create' || raw === 'update') {
+    return raw
+  }
+  return 'auto'
+}
+
 function clampTtl(raw: string): number {
   const parsed = Number.parseInt(raw, 10)
   if (Number.isNaN(parsed)) {
@@ -30,21 +40,28 @@ function optional(value: string): string | undefined {
   return value.length > 0 ? value : undefined
 }
 
+type Action = 'created' | 'updated'
+
 interface Result {
   link: string
   ownerLink: string
   id: string
   namespace: string
   expiresAt?: string
+  action: Action
 }
 
-function toResult(response: CreateResponse | UpdateResponse): Result {
+function toResult(
+  response: CreateResponse | UpdateResponse,
+  action: Action
+): Result {
   return {
     link: response.link,
     ownerLink: response.ownerLink,
     id: response.id,
     namespace: response.namespace,
-    expiresAt: response.expiresAt
+    expiresAt: response.expiresAt,
+    action
   }
 }
 
@@ -61,6 +78,7 @@ export async function run(): Promise<void> {
     const tags = optional(core.getInput('tags'))
     const entry = optional(core.getInput('entry'))
     const updateId = optional(core.getInput('update-id'))
+    const mode = parseMode(core.getInput('mode') || 'auto')
     const ttl = clampTtl(core.getInput('ttl-days') || '15')
 
     const showTopBarRaw = core.getInput('show-top-bar')
@@ -79,12 +97,20 @@ export async function run(): Promise<void> {
     core.setSecret(ownerToken)
 
     const kind: Kind = detectKind(path, core.getInput('kind') || 'auto')
-    const isUpdate = updateId !== undefined
+
+    const targetId = await resolveTargetId({
+      mode,
+      updateId,
+      ownerToken,
+      minted,
+      baseUrl,
+      namespace,
+      kind
+    })
 
     const result = await publish({
       kind,
-      isUpdate,
-      updateId,
+      updateId: targetId,
       path,
       baseUrl,
       namespace,
@@ -110,7 +136,8 @@ export async function run(): Promise<void> {
       namespace: result.namespace,
       expiresAt: result.expiresAt,
       ownerToken,
-      minted
+      minted,
+      action: result.action
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -122,9 +149,67 @@ export async function run(): Promise<void> {
   }
 }
 
+interface ResolveTargetArgs {
+  mode: Mode
+  updateId?: string
+  ownerToken: string
+  minted: boolean
+  baseUrl: string
+  namespace: string
+  kind: Kind
+}
+
+// Decide which existing resource id (if any) the publish should update.
+// Explicit update-id always wins. In auto/update mode an owner token can discover
+// its own prior resource for the same namespace+kind. mode=create never updates.
+// A freshly minted token has no prior resources, so discovery is skipped.
+async function resolveTargetId(
+  args: ResolveTargetArgs
+): Promise<string | undefined> {
+  const { mode, updateId, ownerToken, minted, baseUrl, namespace, kind } = args
+
+  if (updateId !== undefined) {
+    return updateId
+  }
+
+  if (mode === 'create') {
+    return undefined
+  }
+
+  if (mode === 'auto' && minted) {
+    // A token minted this run cannot own any existing resource: create directly.
+    return undefined
+  }
+
+  if (mode === 'auto' || mode === 'update') {
+    const discovery = await discoverOwnResource(
+      baseUrl,
+      ownerToken,
+      namespace,
+      kind
+    )
+    if (discovery.status === 'found') {
+      return discovery.id
+    }
+    if (discovery.status === 'ambiguous') {
+      core.warning(
+        `Multiple ${kind} resources found in namespace "${namespace}"; cannot auto-select one. ` +
+          'Pass update-id to target a specific resource. Creating a new resource instead.'
+      )
+    }
+    if (mode === 'update') {
+      throw new Error(
+        `mode=update requires an existing resource, but none could be resolved for ` +
+          `namespace "${namespace}" and kind "${kind}" (set update-id or use mode=auto).`
+      )
+    }
+  }
+
+  return undefined
+}
+
 interface PublishArgs {
   kind: Kind
-  isUpdate: boolean
   updateId?: string
   path: string
   baseUrl: string
@@ -140,7 +225,6 @@ interface PublishArgs {
 async function publish(args: PublishArgs): Promise<Result> {
   const {
     kind,
-    isUpdate,
     updateId,
     path,
     baseUrl,
@@ -153,7 +237,7 @@ async function publish(args: PublishArgs): Promise<Result> {
     showTopBar
   } = args
 
-  if (isUpdate && updateId !== undefined) {
+  if (updateId !== undefined) {
     if (kind === 'site') {
       return toResult(
         await putSite(baseUrl, {
@@ -163,7 +247,8 @@ async function publish(args: PublishArgs): Promise<Result> {
           ttl,
           entry,
           ownerToken
-        })
+        }),
+        'updated'
       )
     }
     if (kind === 'html' || kind === 'markdown') {
@@ -174,12 +259,13 @@ async function publish(args: PublishArgs): Promise<Result> {
           id: updateId,
           ttl,
           ownerToken
-        })
+        }),
+        'updated'
       )
     }
     // Files are immutable: there is no PUT for /api/files, so create a new resource.
     core.warning(
-      'update-id was supplied for a file artefact, but files are immutable. Creating a new resource instead.'
+      'A file artefact cannot be updated in place (files are immutable). Creating a new resource instead.'
     )
   }
 
@@ -193,7 +279,8 @@ async function publish(args: PublishArgs): Promise<Result> {
         entry,
         ownerToken,
         password
-      })
+      }),
+      'created'
     )
   }
   if (kind === 'html' || kind === 'markdown') {
@@ -208,7 +295,8 @@ async function publish(args: PublishArgs): Promise<Result> {
         ownerToken,
         password,
         showTopBar: format === 'html' ? showTopBar : undefined
-      })
+      }),
+      'created'
     )
   }
   return toResult(
@@ -219,7 +307,8 @@ async function publish(args: PublishArgs): Promise<Result> {
       tags,
       ownerToken,
       password
-    })
+    }),
+    'created'
   )
 }
 

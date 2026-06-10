@@ -30455,6 +30455,70 @@ var core = /*#__PURE__*/Object.freeze({
     warning: warning
 });
 
+const USER_AGENT = 'brewpage-action';
+const GALLERY_PAGE_SIZE = 100;
+function matchesKind(type, kind) {
+    const normalized = type.toLowerCase();
+    switch (kind) {
+        case 'site':
+            return normalized === 'site';
+        case 'html':
+            return normalized === 'html';
+        case 'markdown':
+            return normalized === 'markdown' || normalized === 'md';
+        case 'file':
+            return normalized === 'file';
+    }
+}
+// GET /api/gallery?mine=true: list the caller's own publications (all kinds and
+// namespaces, including private) and resolve the single resource matching ns+kind.
+// Returns the id to update, or a non-found signal so the caller can create instead.
+// Any non-2xx response or network failure is reported as 'unavailable'.
+async function discoverOwnResource(baseUrl, ownerToken, ns, kind) {
+    const matches = [];
+    let page = 0;
+    try {
+        for (;;) {
+            const url = buildUrl(baseUrl, '/api/gallery', {
+                mine: 'true',
+                size: GALLERY_PAGE_SIZE,
+                page
+            });
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Owner-Token': ownerToken,
+                    'User-Agent': USER_AGENT
+                }
+            });
+            if (!response.ok) {
+                return { status: 'unavailable' };
+            }
+            const body = (await response.json());
+            const items = Array.isArray(body.items) ? body.items : [];
+            for (const item of items) {
+                if (item.namespace === ns && matchesKind(item.type, kind)) {
+                    matches.push(item);
+                }
+            }
+            const seen = (page + 1) * GALLERY_PAGE_SIZE;
+            if (seen >= body.total || items.length === 0) {
+                break;
+            }
+            page += 1;
+        }
+    }
+    catch {
+        return { status: 'unavailable' };
+    }
+    if (matches.length === 0) {
+        return { status: 'none' };
+    }
+    if (matches.length > 1) {
+        return { status: 'ambiguous' };
+    }
+    return { status: 'found', id: matches[0].id };
+}
 function trimBase(baseUrl) {
     return baseUrl.replace(/\/+$/, '');
 }
@@ -30676,7 +30740,11 @@ function repoNamespace(repository) {
 // and a prominent persist-the-token notice when a fresh owner token was minted.
 async function buildSummary(coreModule, data) {
     const summary = coreModule.summary;
+    const headline = data.action === 'updated'
+        ? 'Updated existing resource on BrewPage'
+        : 'Created resource on BrewPage';
     summary.addHeading('Published to BrewPage', 2);
+    summary.addRaw(headline, true);
     summary.addLink(data.link, data.link);
     summary.addTable([
         [
@@ -30706,6 +30774,12 @@ async function buildSummary(coreModule, data) {
 const DEFAULT_BASE_URL = 'https://brewpage.app';
 const MIN_TTL = 1;
 const MAX_TTL = 30;
+function parseMode(raw) {
+    if (raw === 'create' || raw === 'update') {
+        return raw;
+    }
+    return 'auto';
+}
 function clampTtl(raw) {
     const parsed = Number.parseInt(raw, 10);
     if (Number.isNaN(parsed)) {
@@ -30716,13 +30790,14 @@ function clampTtl(raw) {
 function optional(value) {
     return value.length > 0 ? value : undefined;
 }
-function toResult(response) {
+function toResult(response, action) {
     return {
         link: response.link,
         ownerLink: response.ownerLink,
         id: response.id,
         namespace: response.namespace,
-        expiresAt: response.expiresAt
+        expiresAt: response.expiresAt,
+        action
     };
 }
 async function run() {
@@ -30736,6 +30811,7 @@ async function run() {
         const tags = optional(getInput('tags'));
         const entry = optional(getInput('entry'));
         const updateId = optional(getInput('update-id'));
+        const mode = parseMode(getInput('mode') || 'auto');
         const ttl = clampTtl(getInput('ttl-days') || '15');
         const showTopBarRaw = getInput('show-top-bar');
         const showTopBar = showTopBarRaw === '' ? undefined : showTopBarRaw === 'true';
@@ -30750,11 +30826,18 @@ async function run() {
         }
         setSecret(ownerToken);
         const kind = detectKind(path, getInput('kind') || 'auto');
-        const isUpdate = updateId !== undefined;
+        const targetId = await resolveTargetId({
+            mode,
+            updateId,
+            ownerToken,
+            minted,
+            baseUrl,
+            namespace,
+            kind
+        });
         const result = await publish({
             kind,
-            isUpdate,
-            updateId,
+            updateId: targetId,
             path,
             baseUrl,
             namespace,
@@ -30778,7 +30861,8 @@ async function run() {
             namespace: result.namespace,
             expiresAt: result.expiresAt,
             ownerToken,
-            minted
+            minted,
+            action: result.action
         });
     }
     catch (error) {
@@ -30791,9 +30875,41 @@ async function run() {
         }
     }
 }
+// Decide which existing resource id (if any) the publish should update.
+// Explicit update-id always wins. In auto/update mode an owner token can discover
+// its own prior resource for the same namespace+kind. mode=create never updates.
+// A freshly minted token has no prior resources, so discovery is skipped.
+async function resolveTargetId(args) {
+    const { mode, updateId, ownerToken, minted, baseUrl, namespace, kind } = args;
+    if (updateId !== undefined) {
+        return updateId;
+    }
+    if (mode === 'create') {
+        return undefined;
+    }
+    if (mode === 'auto' && minted) {
+        // A token minted this run cannot own any existing resource: create directly.
+        return undefined;
+    }
+    if (mode === 'auto' || mode === 'update') {
+        const discovery = await discoverOwnResource(baseUrl, ownerToken, namespace, kind);
+        if (discovery.status === 'found') {
+            return discovery.id;
+        }
+        if (discovery.status === 'ambiguous') {
+            warning(`Multiple ${kind} resources found in namespace "${namespace}"; cannot auto-select one. ` +
+                'Pass update-id to target a specific resource. Creating a new resource instead.');
+        }
+        if (mode === 'update') {
+            throw new Error(`mode=update requires an existing resource, but none could be resolved for ` +
+                `namespace "${namespace}" and kind "${kind}" (set update-id or use mode=auto).`);
+        }
+    }
+    return undefined;
+}
 async function publish(args) {
-    const { kind, isUpdate, updateId, path, baseUrl, namespace, ttl, tags, entry, password, ownerToken, showTopBar } = args;
-    if (isUpdate && updateId !== undefined) {
+    const { kind, updateId, path, baseUrl, namespace, ttl, tags, entry, password, ownerToken, showTopBar } = args;
+    if (updateId !== undefined) {
         if (kind === 'site') {
             return toResult(await putSite(baseUrl, {
                 dirOrZip: path,
@@ -30802,7 +30918,7 @@ async function publish(args) {
                 ttl,
                 entry,
                 ownerToken
-            }));
+            }), 'updated');
         }
         if (kind === 'html' || kind === 'markdown') {
             return toResult(await putHtml(baseUrl, {
@@ -30811,10 +30927,10 @@ async function publish(args) {
                 id: updateId,
                 ttl,
                 ownerToken
-            }));
+            }), 'updated');
         }
         // Files are immutable: there is no PUT for /api/files, so create a new resource.
-        warning('update-id was supplied for a file artefact, but files are immutable. Creating a new resource instead.');
+        warning('A file artefact cannot be updated in place (files are immutable). Creating a new resource instead.');
     }
     if (kind === 'site') {
         return toResult(await postSite(baseUrl, {
@@ -30825,7 +30941,7 @@ async function publish(args) {
             entry,
             ownerToken,
             password
-        }));
+        }), 'created');
     }
     if (kind === 'html' || kind === 'markdown') {
         const format = kind === 'markdown' ? 'markdown' : 'html';
@@ -30838,7 +30954,7 @@ async function publish(args) {
             ownerToken,
             password,
             showTopBar: format === 'html' ? showTopBar : undefined
-        }));
+        }), 'created');
     }
     return toResult(await postFile(baseUrl, {
         filePath: path,
@@ -30847,7 +30963,7 @@ async function publish(args) {
         tags,
         ownerToken,
         password
-    }));
+    }), 'created');
 }
 async function readText(path) {
     const { readFile } = await import('node:fs/promises');

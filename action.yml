@@ -34,8 +34,12 @@ inputs:
     description: 'X-Owner-Token for the resource. Empty auto-mints a token that is surfaced in the job summary -- persist it as a secret for redeploys.'
     required: false
     default: ''
+  mode:
+    description: 'Publish mode: auto | create | update. auto (default) auto-republishes -- with a persisted owner-token it discovers the matching resource for this namespace+kind on https://brewpage.app and updates it (PUT), or creates one on first run. create always creates a new resource; update requires an existing resource (update-id or a discoverable one) and fails otherwise.'
+    required: false
+    default: 'auto'
   update-id:
-    description: 'Id of an existing resource. With owner-token, updates the existing resource (PUT) instead of creating a new one.'
+    description: 'Id of an existing resource. With owner-token, explicitly updates that resource (PUT) instead of relying on auto-discovery. Takes precedence over mode auto-discovery.'
     required: false
     default: ''
   entry:

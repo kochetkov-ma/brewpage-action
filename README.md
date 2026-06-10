@@ -19,7 +19,8 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 | `ttl-days` | no | `15` | Time to live in days (1..30) before the resource expires on [brewpage.app](https://brewpage.app). |
 | `tags` | no | _(empty)_ | Comma-separated tags used for search and grouping on [brewpage.app](https://brewpage.app). |
 | `owner-token` | no | _(empty)_ | `X-Owner-Token` for the resource. Empty auto-mints a token surfaced in the job summary -- persist it as a secret for redeploys. |
-| `update-id` | no | _(empty)_ | Id of an existing resource on [brewpage.app](https://brewpage.app). With `owner-token`, updates that resource (PUT) instead of creating a new one. |
+| `mode` | no | `auto` | Publish mode: `auto`, `create`, or `update`. `auto` auto-republishes -- with a persisted `owner-token` it discovers the matching resource for this namespace+kind via the [brewpage.app](https://brewpage.app) owner gallery and updates it (PUT), or creates one on first run. `create` always creates a new resource; `update` requires an existing resource (`update-id` or a discoverable one) and fails otherwise. |
+| `update-id` | no | _(empty)_ | Id of an existing resource on [brewpage.app](https://brewpage.app). With `owner-token`, explicitly updates that resource (PUT) instead of relying on auto-discovery. Takes precedence over `mode` auto-discovery. |
 | `entry` | no | _(empty)_ | Site entry file override (default `index.html`). |
 | `show-top-bar` | no | _(empty)_ | HTML only: toggle the [brewpage.app](https://brewpage.app) toolbar. |
 | `brewpage-url` | no | _(empty)_ | API base URL override. Empty uses `https://brewpage.app`. |
@@ -69,9 +70,67 @@ On the first run leave `owner-token` empty. The action mints a token and prints 
 
 > The minted `owner-token` is the only credential that can manage, update, or delete the resource on [brewpage.app](https://brewpage.app). Losing it makes the resource unmanageable. Copy it from the job summary if you do not automate the secret step above.
 
+### Full-auto redeploy (mint once, then just `path:`)
+
+With `mode: auto` (the default) and a persisted `owner-token`, the action keeps a single stable URL on [brewpage.app](https://brewpage.app) across runs. No `update-id` bookkeeping: on each run it discovers your existing resource via the owner gallery and PUTs over it; the first run creates it.
+
+**Step 1 -- mint an owner token once and save it as a secret.**
+
+Either let the first run mint it and read the `owner-token` output (also shown in the job summary):
+
+```yaml
+- name: First publish (mints the token)
+  id: brewpage
+  uses: kochetkov-ma/brewpage-action@v1
+  with:
+    path: ./report.html
+
+# Requires a token with secrets:write, e.g. a fine-grained PAT in GH_PAT.
+- name: Persist owner token as a secret
+  env:
+    GH_TOKEN: ${{ secrets.GH_PAT }}
+    OWNER_TOKEN: ${{ steps.brewpage.outputs.owner-token }}
+  run: gh secret set BREWPAGE_OWNER_TOKEN --body "$OWNER_TOKEN"
+```
+
+Or mint one directly against [brewpage.app](https://brewpage.app) and paste it into a repo secret (`BREWPAGE_OWNER_TOKEN`):
+
+```bash
+curl -fsS https://brewpage.app/api/owner-token
+```
+
+**Step 2 -- pass the secret as `owner-token` and just `path:`.** Every later run auto-PUTs the same site at the same URL:
+
+```yaml
+- name: Publish (auto-republish)
+  id: brewpage
+  uses: kochetkov-ma/brewpage-action@v1
+  with:
+    path: ./report.html
+    owner-token: ${{ secrets.BREWPAGE_OWNER_TOKEN }}
+
+- run: echo "Stable URL: ${{ steps.brewpage.outputs.url }}"
+```
+
+Discovery uses the public/owner gallery on [brewpage.app](https://brewpage.app) and is scoped to the deterministic per-repo `namespace` (derived from `github.repository`) plus the artefact `kind`, so each repo+kind maps to its own resource. `update-id` still wins when supplied. Files are immutable: a `file` artefact is always created, never updated in place.
+
+```
+  mint owner-token once          (GET /api/owner-token, or read run #1 output)
+            |
+            v
+  run #1: no resource yet  -----> POST  -> create resource (stable URL)
+            |
+            v
+  run #2..N: discover by owner --> GET /api/gallery?mine=true
+            (match namespace + kind)
+            |
+            v
+                            -----> PUT same resource (URL unchanged)
+```
+
 ### Redeploy / update an existing resource
 
-Pass the saved `owner-token` plus the `update-id` to update the same resource in place (PUT) instead of creating a new one.
+Prefer full-auto redeploy above. To target a specific resource explicitly, pass the saved `owner-token` plus the `update-id` to update it in place (PUT) instead of creating a new one. `update-id` takes precedence over `mode` auto-discovery.
 
 ```yaml
 - name: Redeploy report
