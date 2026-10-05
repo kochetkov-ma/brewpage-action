@@ -41,12 +41,12 @@ Flow: `inputs → mint-or-reuse OT (setSecret) → detect kind + resolve NS → 
 |-------|-----|---------|-------------|
 | `path` | yes | — | File, dir, or `.zip` to publish. |
 | `kind` | no | `auto` | `html` \| `markdown` \| `site` \| `file` \| `auto` |
-| `namespace` | no | _(empty)_ | Empty derives per-repo slug from `github.repository`. `public` = gallery-listed + search-indexed. |
-| `password` | no | _(empty)_ | Set → resource private (hidden from gallery). |
+| `namespace` | no | _(empty)_ | Empty derives per-repo slug from `github.repository`. Unprotected `public` resources are gallery-eligible; custom NS unlisted. NEW sites/native hosts: `noindex`. |
+| `password` | no | _(empty)_ | Access password; protected resource hidden from gallery. Independent of NS/delivery mode; NEW browser links use clean trusted unlock. |
 | `ttl-days` | no | `15` | TTL in days (1..30). |
 | `tags` | no | _(empty)_ | Comma-separated tags. |
 | `owner-token` | no | _(empty)_ | OT for the resource. Empty auto-mints one (surfaced in job summary; persist as secret for redeploys). |
-| `mode` | no | `auto` | `auto` \| `create` \| `update`. `auto` = discover-by-owner then PUT-else-POST; `create` always POST; `update` requires resolvable existing resource else fails. |
+| `mode` | no | `auto` | Publish operation, independent of delivery mode: `auto` \| `create` \| `update`. `auto` = discover-by-owner then PUT-else-POST; `create` always POST; `update` requires resolvable existing resource else fails. |
 | `update-id` | no | _(empty)_ | Id of existing resource. With `owner-token` → explicit PUT. Takes precedence over `mode` auto-discovery. |
 | `entry` | no | _(empty)_ | Site entry file override (default `index.html`). |
 | `show-top-bar` | no | _(empty)_ | HTML only: toggle the BP toolbar. |
@@ -64,7 +64,7 @@ Update routing handled in TS (`src/main.ts`, `resolveTargetId` + `publish`):
 
 | Output | Description |
 |--------|-------------|
-| `url` | Live URL of published resource. |
+| `url` | Exact server-returned `link`; retain OLD URLs unchanged. |
 | `owner-url` | API/owner URL for managing the resource. |
 | `owner-token` | OT for managing resource. Masked in logs. |
 | `id` | Resource id. |
@@ -74,7 +74,8 @@ Update routing handled in TS (`src/main.ts`, `resolveTargetId` + `publish`):
 ### Hard rules — !=regress
 
 1. **Mask OT before writing anywhere.** Call `core.setSecret(ownerToken)` BEFORE `core.setOutput('owner-token', ...)` and before any log/summary line that could contain it. Masking only redacts output emitted AFTER the `setSecret` call. OT = only credential that can manage/delete/republish a resource — leaking | losing it → resource unmanageable forever.
-2. **Preserve NS `public` warning.** Default/`public` NS = listed in BP homepage gallery + search-indexed. Private resources require custom NS + password. Mirror stance from `brewpage-openapi` SPEC preamble; keep warning in `action.yml` + `README.md`.
+2. **Preserve hosting/access contract.** NS, password, delivery mode and indexation are independent. Unprotected `public` resources are gallery-eligible; custom NS unlisted, not access-protected. NEW sites/native hosts are `noindex`. NEW sites/non-public NS require subdomains; public non-sites default to Promotion even with passwords. This ACT uses server defaults; `mode` selects publish operation only.
+3. **Preserve server links exactly.** Pass response `link` unchanged to output/summary; !=derive hosts from IDs or append NEW passwords. NEW protected browser links use top-level `unlock.brewpage.app`; automated reads use apex `X-Password`. Owner/API links stay apex; all OLD behavior/links unchanged. Keep `action.yml` + `README.md` aligned with SPEC.
 
 `@actions/core` (`setOutput`) writes `$GITHUB_OUTPUT`. !=deprecated `::set-output::` WF cmd.
 

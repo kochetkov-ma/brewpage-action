@@ -31,6 +31,9 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 **Headers:** `X-Owner-Token`, `X-Password`.
 **Response keys:** `id`, `namespace`, `link`, `ownerLink`, `expiresAt`, `sizeBytes`, `tags`, `ownerToken`.
 
+**Hosting:** NEW sites/non-public namespaces require dedicated hosts; public non-sites default to Promotion, including protected content. Namespace, password, delivery mode and indexation are independent. NEW sites/native hosts are `noindex`; `public` only makes unprotected resources gallery-eligible. This action uses server defaults; `mode` controls create/update, not delivery.
+**Links:** Pass server `link` unchanged to URL output/summary; never derive hosts from IDs or append NEW passwords. NEW protected browser links use top-level `unlock.brewpage.app`; automated reads use apex `X-Password`. Owner/API links stay apex; OLD behavior/links unchanged.
+
 > For any endpoint/param/header/field question: read SPEC in brewpage-openapi. !=invent fields.
 
 ## @actions/core usage
@@ -87,7 +90,7 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 
 1. **setSecret before output.** `core.setSecret(ownerToken)` BEFORE writing `owner-token` output or any log line that may contain it. OT = only credential to manage/delete/republish; leak/loss = resource unmanageable forever.
 2. **Pin all versions exact.** Every `uses:`, npm dep, action ref -> exact `vX.Y.Z`/`X.Y.Z`. Verify via registry. Forbidden: `@latest`, `@v4`, `@main`, `^x.y`.
-3. **Preserve public-namespace warning.** Default `namespace: public` = gallery-listed + search-indexed. Keep warning in action.yml + README.
+3. **Preserve hosting/access guidance.** Namespace/password/delivery/indexation independent; custom namespace is unlisted, not access-protected. NEW sites/native hosts `noindex`; public !=guaranteed indexing. Keep action.yml + README aligned with SPEC and pass exact server links; OLD unchanged.
 4. **Keep branding metadata.** `name`, `description`, `branding` mandatory for MKT.
 
 ## Drift -- update in lockstep
@@ -105,5 +108,5 @@ Inputs/outputs change -> update ALL THREE in same change:
 - [ ] action.yml valid YAML; `name`/`description`/`branding` present
 - [ ] REST shape matches SPEC (endpoints, headers, response keys)
 - [ ] all versions pinned exact; no floating refs
-- [ ] public-namespace warning preserved
+- [ ] hosting/access guidance preserved; exact server links, NEW native `noindex`, clean protected links and unchanged OLD behavior
 - [ ] inputs/outputs synced across action.yml + README + openapi snapshot

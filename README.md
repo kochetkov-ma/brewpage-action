@@ -14,12 +14,12 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 |-------|----------|---------|-------------|
 | `path` | yes | -- | File, directory, or `.zip` to publish to [brewpage.app](https://brewpage.app). |
 | `kind` | no | `auto` | Artefact kind: `html`, `markdown`, `site`, `file`, or `auto`. |
-| `namespace` | no | _(empty)_ | Target namespace. Empty derives a deterministic per-repo slug from `github.repository`. The default `public` namespace is gallery-listed on [brewpage.app](https://brewpage.app) and search-indexed; set a private namespace to keep the resource unlisted. |
-| `password` | no | _(empty)_ | When set, the resource is private and hidden from the [brewpage.app](https://brewpage.app) gallery. |
+| `namespace` | no | _(empty)_ | Target namespace. Empty derives a deterministic per-repo slug from `github.repository`. Unprotected `public` resources are eligible for the gallery; custom namespaces are unlisted. NEW sites and all native publication hosts are `noindex`. Namespace, password and delivery mode are independent. |
+| `password` | no | _(empty)_ | Optional access password; protected resources are hidden from the gallery. NEW browser links stay clean and unlock through `unlock.brewpage.app`; password protection does not select delivery mode. |
 | `ttl-days` | no | `15` | Time to live in days (1..30) before the resource expires on [brewpage.app](https://brewpage.app). |
 | `tags` | no | _(empty)_ | Comma-separated tags used for search and grouping on [brewpage.app](https://brewpage.app). |
 | `owner-token` | no | _(empty)_ | `X-Owner-Token` for the resource. Empty auto-mints a token surfaced in the job summary -- persist it as a secret for redeploys. |
-| `mode` | no | `auto` | Publish mode: `auto`, `create`, or `update`. `auto` auto-republishes -- with a persisted `owner-token` it discovers the matching resource for this namespace+kind via the [brewpage.app](https://brewpage.app) owner gallery and updates it (PUT), or creates one on first run. `create` always creates a new resource; `update` requires an existing resource (`update-id` or a discoverable one) and fails otherwise. |
+| `mode` | no | `auto` | Publish operation: `auto`, `create`, or `update`; independent of delivery mode. `auto` auto-republishes -- with a persisted `owner-token` it discovers the matching resource for this namespace+kind via the [brewpage.app](https://brewpage.app) owner gallery and updates it (PUT), or creates one on first run. `create` always creates a new resource; `update` requires an existing resource (`update-id` or a discoverable one) and fails otherwise. |
 | `update-id` | no | _(empty)_ | Id of an existing resource on [brewpage.app](https://brewpage.app). With `owner-token`, explicitly updates that resource (PUT) instead of relying on auto-discovery. Takes precedence over `mode` auto-discovery. |
 | `entry` | no | _(empty)_ | Site entry file override (default `index.html`). |
 | `show-top-bar` | no | _(empty)_ | HTML only: toggle the [brewpage.app](https://brewpage.app) toolbar. |
@@ -30,14 +30,20 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 
 | Output | Description |
 |--------|-------------|
-| `url` | Live URL of the published resource on [brewpage.app](https://brewpage.app). |
+| `url` | Exact server-returned `link` of the published resource; existing OLD links remain unchanged. |
 | `owner-url` | API/owner URL for managing the resource. |
 | `owner-token` | Owner token (masked in logs). Persist to a secret to manage/redeploy the resource. |
 | `id` | Resource id. |
 | `namespace` | Namespace the resource was published to. |
 | `expires-at` | Expiry timestamp. |
 
-> **Public namespace warning.** The default/`public` namespace is gallery-listed on [brewpage.app](https://brewpage.app) and search-indexed. To keep a resource unlisted and private, set a custom `namespace` **and** a `password`.
+## Hosting and access
+
+NEW publications carry `routingCohort=new-v1`; existing OLD publications retain their behavior and URLs. Every NEW site uses one dedicated publication host for its complete bundle. NEW resources in custom namespaces also require a dedicated host. NEW public non-sites default to Promotion on the main BrewPage URL; password protection does not force a dedicated host. This action uses server defaults and exposes no delivery-mode input; its `mode` input controls create/update operations.
+
+Namespace, password protection, delivery mode and search indexation are independent. Unprotected `public` resources are eligible for the gallery. Custom namespaces are unlisted, but an unlisted link alone does not restrict access. A password protects access and hides the resource from the gallery in either namespace. NEW sites and all native publication hosts are `noindex`; `public` does not guarantee search indexing or ranking.
+
+Use the `url` output exactly as returned by the server. Do not reconstruct a hostname from the resource id or append passwords to NEW links. NEW protected browser links use the trusted top-level `unlock.brewpage.app` gateway; automated readers use the existing apex API with `X-Password`. Owner/API links remain on the main BrewPage host, and OLD links stay unchanged.
 
 ## Usage
 

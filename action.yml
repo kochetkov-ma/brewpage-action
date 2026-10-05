@@ -15,11 +15,11 @@ inputs:
     required: false
     default: 'auto'
   namespace:
-    description: 'Target namespace. Empty derives a deterministic per-repo slug from github.repository. The default "public" namespace is gallery-listed on https://brewpage.app and search-indexed; set a private namespace to keep the resource unlisted.'
+    description: 'Target namespace. Empty derives a deterministic per-repo slug from github.repository. Unprotected "public" resources are eligible for the gallery; custom namespaces are unlisted. NEW sites and all native publication hosts are noindex. Namespace, password and delivery mode are independent.'
     required: false
     default: ''
   password:
-    description: 'Optional password. When set, the resource is private (hidden from the brewpage.app gallery).'
+    description: 'Optional access password; protected resources are hidden from the gallery. NEW browser links stay clean and unlock through unlock.brewpage.app; password protection does not select delivery mode.'
     required: false
     default: ''
   ttl-days:
@@ -35,7 +35,7 @@ inputs:
     required: false
     default: ''
   mode:
-    description: 'Publish mode: auto | create | update. auto (default) auto-republishes -- with a persisted owner-token it discovers the matching resource for this namespace+kind on https://brewpage.app and updates it (PUT), or creates one on first run. create always creates a new resource; update requires an existing resource (update-id or a discoverable one) and fails otherwise.'
+    description: 'Publish operation: auto | create | update; independent of delivery mode. auto (default) auto-republishes -- with a persisted owner-token it discovers the matching resource for this namespace+kind on https://brewpage.app and updates it (PUT), or creates one on first run. create always creates a new resource; update requires an existing resource (update-id or a discoverable one) and fails otherwise.'
     required: false
     default: 'auto'
   update-id:
@@ -61,7 +61,7 @@ inputs:
 
 outputs:
   url:
-    description: 'Live URL of the published resource on brewpage.app.'
+    description: 'Exact server-returned link of the published resource; existing OLD links remain unchanged.'
   owner-url:
     description: 'API/owner URL for managing the resource.'
   owner-token:
