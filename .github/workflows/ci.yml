@@ -5,13 +5,17 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.3
@@ -19,7 +23,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6.4.0
         with:
-          node-version-file: .node-version
+          node-version: '24.19.0'
           cache: npm
 
       - name: Install dependencies
@@ -35,7 +39,7 @@ jobs:
         run: npm run build
 
       - name: Validate action.yml is well-formed YAML
-        run: npx --yes js-yaml action.yml > /dev/null
+        run: npx --no-install js-yaml action.yml > /dev/null
 
       - name: Assert required Marketplace metadata is present
         run: |
