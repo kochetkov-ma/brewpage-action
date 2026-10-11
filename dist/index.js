@@ -30668,7 +30668,7 @@ async function buildSiteForm(dirOrZip) {
     return form;
 }
 // POST /api/sites: publish a multi-file static site. A .zip path uploads as `archive`;
-// a directory is walked recursively and sent as parallel `files[]` + `paths[]` arrays.
+// a directory is walked recursively and sent as repeated `files` + `paths` fields.
 async function postSite(baseUrl, options) {
     const url = buildUrl(baseUrl, '/api/sites', {
         ns: options.ns,

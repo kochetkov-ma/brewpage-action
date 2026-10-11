@@ -327,7 +327,7 @@ async function buildSiteForm(dirOrZip: string): Promise<FormData> {
 }
 
 // POST /api/sites: publish a multi-file static site. A .zip path uploads as `archive`;
-// a directory is walked recursively and sent as parallel `files[]` + `paths[]` arrays.
+// a directory is walked recursively and sent as repeated `files` + `paths` fields.
 export async function postSite(
   baseUrl: string,
   options: {

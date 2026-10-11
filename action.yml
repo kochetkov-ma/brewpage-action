@@ -15,7 +15,7 @@ inputs:
     required: false
     default: 'auto'
   namespace:
-    description: 'Target namespace. Empty derives a deterministic per-repo slug from github.repository. Unprotected "public" resources are eligible for the gallery; custom namespaces are unlisted. NEW sites and all native publication hosts are noindex. Namespace, password and delivery mode are independent.'
+    description: 'Target namespace. Empty derives a deterministic per-repo slug from github.repository. Unprotected "public" resources are eligible for the gallery; custom namespaces are unlisted. Eligible public HTML, sites and files may permit indexing on native hosts. Namespace, password and delivery mode are independent.'
     required: false
     default: ''
   password:
@@ -23,7 +23,7 @@ inputs:
     required: false
     default: ''
   ttl-days:
-    description: 'Time to live in days (1..30).'
+    description: 'Requested creation TTL in days (1..30), subject to owner limits. PUT retains the original expiry.'
     required: false
     default: '15'
   tags:

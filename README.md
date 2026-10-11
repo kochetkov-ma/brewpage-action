@@ -14,9 +14,9 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 |-------|----------|---------|-------------|
 | `path` | yes | -- | File, directory, or `.zip` to publish to [brewpage.app](https://brewpage.app). |
 | `kind` | no | `auto` | Artefact kind: `html`, `markdown`, `site`, `file`, or `auto`. |
-| `namespace` | no | _(empty)_ | Target namespace. Empty derives a deterministic per-repo slug from `github.repository`. Unprotected `public` resources are eligible for the gallery; custom namespaces are unlisted. NEW sites and all native publication hosts are `noindex`. Namespace, password and delivery mode are independent. |
+| `namespace` | no | _(empty)_ | Target namespace. Empty derives a deterministic per-repo slug from `github.repository`. Unprotected `public` resources are eligible for the gallery; custom namespaces are unlisted. Eligible public HTML, sites and files may permit indexing on native hosts. Namespace, password and delivery mode are independent. |
 | `password` | no | _(empty)_ | Optional access password; protected resources are hidden from the gallery. NEW browser links stay clean and unlock through `unlock.brewpage.app`; password protection does not select delivery mode. |
-| `ttl-days` | no | `15` | Time to live in days (1..30) before the resource expires on [brewpage.app](https://brewpage.app). |
+| `ttl-days` | no | `15` | Requested creation TTL in days (1..30), subject to owner limits. PUT retains the original expiry; use the returned `expires-at`. |
 | `tags` | no | _(empty)_ | Comma-separated tags used for search and grouping on [brewpage.app](https://brewpage.app). |
 | `owner-token` | no | _(empty)_ | `X-Owner-Token` for the resource. Empty auto-mints a token surfaced in the job summary -- persist it as a secret for redeploys. |
 | `mode` | no | `auto` | Publish operation: `auto`, `create`, or `update`; independent of delivery mode. `auto` auto-republishes -- with a persisted `owner-token` it discovers the matching resource for this namespace+kind via the [brewpage.app](https://brewpage.app) owner gallery and updates it (PUT), or creates one on first run. `create` always creates a new resource; `update` requires an existing resource (`update-id` or a discoverable one) and fails otherwise. |
@@ -41,7 +41,7 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 
 NEW publications carry `routingCohort=new-v1`; existing OLD publications retain their behavior and URLs. Every NEW site uses one dedicated publication host for its complete bundle. NEW resources in custom namespaces also require a dedicated host. NEW public non-sites default to Promotion on the main BrewPage URL; password protection does not force a dedicated host. This action uses server defaults and exposes no delivery-mode input; its `mode` input controls create/update operations.
 
-Namespace, password protection, delivery mode and search indexation are independent. Unprotected `public` resources are eligible for the gallery. Custom namespaces are unlisted, but an unlisted link alone does not restrict access. A password protects access and hides the resource from the gallery in either namespace. NEW sites and all native publication hosts are `noindex`; `public` does not guarantee search indexing or ranking.
+Namespace, password protection, delivery mode and search indexation are independent. Unprotected `public` resources are eligible for the gallery. Custom namespaces are unlisted, but an unlisted link alone does not restrict access. A password protects access and hides the resource from the gallery in either namespace. Eligible public HTML, sites and files may receive `X-Robots-Tag: all` on native hosts; unlisted, protected or otherwise ineligible responses retain `noindex, nofollow`. Crawler access restrictions apply separately; `public` does not guarantee search indexing or ranking.
 
 Use the `url` output exactly as returned by the server. Do not reconstruct a hostname from the resource id or append passwords to NEW links. NEW protected browser links use the trusted top-level `unlock.brewpage.app` gateway; automated readers use the existing apex API with `X-Password`. Owner/API links remain on the main BrewPage host, and OLD links stay unchanged.
 
@@ -65,7 +65,7 @@ Use this for a quick one-off preview. You pass only `path` (and optionally `kind
 
 **Requests made:** `GET /api/owner-token` (mints a fresh token), then a `POST` create (`/api/html`, `/api/sites`, or `/api/files` depending on kind).
 
-**What happens:** a brand-new resource and URL are created on [brewpage.app](https://brewpage.app) on every run. The freshly minted `owner-token` is shown in the job summary and exposed as the `owner-token` output. If you want to keep updating the same URL later, save that token -- see the next scenario.
+**What happens:** the action submits a create request and uses the server-returned resource identity and URL, which may belong to an existing publication. The freshly minted `owner-token` is masked in the job summary and exposed as the `owner-token` output. If you want to keep updating the same URL later, save the token -- see the next scenario.
 
 ### 2. Generate an owner token once (setup for reuse)
 
@@ -187,7 +187,7 @@ Versioning is tag-based:
 3. The tag push triggers `release.yml`: checkout, `npm ci`, lint, test, build, verify the committed `dist/` matches a fresh rebuild (fails on drift), create the GitHub Release ([softprops/action-gh-release](https://github.com/softprops/action-gh-release)), and force-move the major tag `v1` to the released commit so `@v1` consumers auto-update.
 4. The very first Marketplace listing requires a one-time manual acceptance of the Marketplace Terms of Service in the Release UI; subsequent releases publish automatically.
 
-Latest release: `v1.1.0` (full-auto republish). `@v1` is the stable consumer ref and tracks the latest `v1.x`.
+`@v1` is the stable consumer ref and tracks released `v1.x` versions. Check the repository's releases for the current exact version.
 
 ## License
 
