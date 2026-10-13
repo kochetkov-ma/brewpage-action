@@ -1,5 +1,5 @@
 name: 'Publish to BrewPage'
-description: 'Publish CI artefacts -- HTML, markdown, multi-file sites, and files -- to BrewPage (https://brewpage.app) and expose the live URL as a job output.'
+description: 'Publish HTML, Markdown, multi-file sites and files from CI to BrewPage and get the live URL as a step output.'
 author: 'kochetkov-ma'
 
 branding:
