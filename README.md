@@ -1,6 +1,6 @@
 # brewpage-action
 
-[![CI](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/ci.yml/badge.svg)](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/ci.yml) [![check-dist](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/check-dist.yml/badge.svg)](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/check-dist.yml) [![Release](https://img.shields.io/github/v/release/kochetkov-ma/brewpage-action?sort=semver)](https://github.com/kochetkov-ma/brewpage-action/releases) [![Marketplace](https://img.shields.io/badge/Marketplace-Publish%20to%20BrewPage-purple)](https://github.com/marketplace/actions/publish-to-brewpage) [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![CI](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/ci.yml/badge.svg)](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/ci.yml) [![check-dist](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/check-dist.yml/badge.svg)](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/check-dist.yml) [![Release](https://img.shields.io/github/v/release/kochetkov-ma/brewpage-action?sort=semver)](https://github.com/kochetkov-ma/brewpage-action/releases) [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 Publish CI artefacts -- HTML reports, markdown, multi-file sites (Playwright reports, generated docs, static builds), and single files -- to [BrewPage](https://brewpage.app) from a GitHub workflow. One step, one live URL on [brewpage.app](https://brewpage.app) as a job output.
 
@@ -187,7 +187,7 @@ Versioning is tag-based:
 1. Bump the version in `package.json`.
 2. Create an annotated tag and push it: `git tag -a vX.Y.Z -m "..."` then `git push origin main && git push origin vX.Y.Z`.
 3. The tag push triggers `release.yml`: checkout, `npm ci`, lint, test, build, verify the committed `dist/` matches a fresh rebuild (fails on drift), create the GitHub Release ([softprops/action-gh-release](https://github.com/softprops/action-gh-release)), and force-move the major tag `v1` to the released commit so `@v1` consumers auto-update.
-4. The very first Marketplace listing requires a one-time manual acceptance of the Marketplace Terms of Service in the Release UI; subsequent releases publish automatically.
+4. The action is not listed on the GitHub Marketplace yet. The very first listing requires a one-time manual acceptance of the Marketplace Terms of Service in the Release UI; after that, releases update the listing automatically.
 
 `@v1` is the stable consumer ref and tracks released `v1.x` versions. Check the repository's releases for the current exact version.
 
