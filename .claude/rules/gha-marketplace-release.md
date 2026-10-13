@@ -6,7 +6,7 @@ paths:
 
 # Marketplace Release — Automated
 
-Tag vX.Y.Z → CI builds dist/ + creates Release + auto-moves v1 + Marketplace publish.
+Tag vX.Y.Z → CI builds dist/ + creates Release + auto-moves v1. Marketplace: not listed yet; once listed, each Release updates the listing.
 
 ## Tagging
 
@@ -29,7 +29,7 @@ Tag vX.Y.Z → CI builds dist/ + creates Release + auto-moves v1 + Marketplace p
 | Item | Value |
 |------|-------|
 | Notes | Summary of changes |
-| URL | https://github.com/marketplace/actions/publish-to-brewpage |
+| URL | https://github.com/kochetkov-ma/brewpage-action/releases (Marketplace URL `marketplace/actions/publish-to-brewpage` answers 404 until listed) |
 | Branding | icon: upload-cloud, color: purple |
 
 ## Commands
