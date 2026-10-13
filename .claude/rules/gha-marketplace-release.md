@@ -6,7 +6,7 @@ paths:
 
 # Marketplace Release — Automated
 
-Tag vX.Y.Z → CI builds dist/ + creates Release + auto-moves v1. Marketplace: not listed yet; once listed, each Release updates the listing.
+Tag vX.Y.Z → CI builds dist/ + creates Release + auto-moves v1. Marketplace: listed since v1.1.2; publishing a Release there = manual owner step (Publishing #2-4).
 
 ## Tagging
 
@@ -21,15 +21,16 @@ Tag vX.Y.Z → CI builds dist/ + creates Release + auto-moves v1. Marketplace: n
 | # | Step |
 |---|------|
 | 1 | Push tag vX.Y.Z → CI validates, builds, creates Release, moves v1 |
-| 2 | First release: owner accepts MKT ToS once. Then auto-updates |
-| 3 | Verify: action.yml has name, description, branding (icon+color) |
+| 2 | Marketplace publish = checkbox "Publish this Action to the GitHub Marketplace" on the Release edit page; only a signed-in browser can tick it → owner step, never CI or an agent. MKT ToS accepted with v1.1.2 |
+| 3 | GitHub validates action.yml of the Release's tag, not of main: name, description under 125 characters, branding (icon+color). Validation fails → fix action.yml, cut a new tag |
+| 4 | After each Release: open the listing URL, confirm it shows the new tag; missing → owner ticks the checkbox (#2) |
 
 ## Release Metadata
 
 | Item | Value |
 |------|-------|
 | Notes | Summary of changes |
-| URL | https://github.com/kochetkov-ma/brewpage-action/releases (Marketplace URL `marketplace/actions/publish-to-brewpage` answers 404 until listed) |
+| URL | https://github.com/marketplace/actions/publish-to-brewpage (Releases: https://github.com/kochetkov-ma/brewpage-action/releases) |
 | Branding | icon: upload-cloud, color: purple |
 
 ## Commands

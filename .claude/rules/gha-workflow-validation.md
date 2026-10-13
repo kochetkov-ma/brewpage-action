@@ -27,7 +27,7 @@ CI + check-dist run on: pull_request + workflow_dispatch only (NO push trigger, 
 | Trigger | Output |
 |---------|--------|
 | Push v* tag | Auto: build + Release + v1 move |
-| First release only | Owner accepts MKT ToS once |
+| After each Release | MKT listing shows the new tag (publish = manual owner step, `gha-marketplace-release.md`) |
 
 ## Smoke Test
 

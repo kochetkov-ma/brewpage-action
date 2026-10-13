@@ -10,13 +10,8 @@ name: Release
 #   3. Move the major tag (e.g. v1) to this commit and force-push it, so
 #      `kochetkov-ma/brewpage-action@v1` consumers auto-pick up the new release.
 #
-# MARKETPLACE: creating a GitHub Release for a repo that holds an action.yml
-# updates the GitHub Actions Marketplace listing automatically -- but ONLY after
-# the action has been listed once. The VERY FIRST listing requires a one-time
-# manual Terms-of-Service acceptance: open the auto-created Release in the GitHub
-# UI, tick "Publish this Action to the GitHub Marketplace", accept the developer
-# agreement, confirm category + branding, and publish. Every release after that
-# is fully automatic via this workflow.
+# MARKETPLACE: this workflow does not publish to the Marketplace; that is a
+# manual owner step per release -> .claude/rules/gha-marketplace-release.md
 
 on:
   push:

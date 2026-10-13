@@ -1,5 +1,7 @@
 ## Publish to BrewPage __TAG__
 
+Marketplace: https://github.com/marketplace/actions/publish-to-brewpage
+
 ### Quick start
 
 ```yaml

@@ -81,9 +81,8 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 ## Release / Marketplace flow
 
 - Tags: unprefixed semver `vX.Y.Z` (e.g. `v1.0.0`). One pkg per repo -> clean `@v1` major ref.
-- Auto GitHub Release on `v*` tag (`.github/workflows/release.yml`). Conventional commits + release-please optional for changelog/version bump.
-- After release: move major tag -> `git tag -f v1 <commit> && git push -f origin v1` so `@v1` consumers update.
-- MKT publish manual (Release UI -> tick "Publish to Marketplace"). !=auto-publish.
+- Auto GitHub Release on `v*` tag (`.github/workflows/release.yml`); the same run force-moves major tag `v1` to the released commit so `@v1` consumers update. !=move `v1` by hand, !=release-please.
+- MKT: listed since `v1.1.2` (<https://github.com/marketplace/actions/publish-to-brewpage>). Publishing a release there = manual owner step, !=auto-publish; procedure: `.claude/rules/gha-marketplace-release.md`.
 - MKT metadata in action.yml REQ: `name`, `description`, `branding` (`icon: upload-cloud`, `color: purple`). !=remove all three.
 
 ## Hard rules -- !=regress

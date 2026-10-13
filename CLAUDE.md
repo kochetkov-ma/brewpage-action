@@ -10,7 +10,7 @@ Node24 TypeScript ACT (`runs.using: node24`, `main: dist/index.js` — committed
 
 BP: proprietary HTML/KV/JSON/file hosting @ <https://brewpage.app>. This REPO ships only ACT glue — not the platform.
 
-MKT listing: none yet (`https://github.com/marketplace/actions/publish-to-brewpage` = 404; `action.yml` name `Publish to BrewPage`) — !=link or badge it until listed. ACT ref: `kochetkov-ma/brewpage-action@v1`.
+MKT listing: `Publish to BrewPage` (`action.yml` name) — <https://github.com/marketplace/actions/publish-to-brewpage>, first published with `v1.1.2`. ACT ref: `kochetkov-ma/brewpage-action@v1`.
 
 ## 2. Cross-links
 
@@ -90,7 +90,7 @@ Follow-up (different repo): record this decision in `brewpage-openapi/ECOSYSTEM-
 TAG-BASED (no release-please, no release PR). Flow:
 - Bump VER in `package.json`. Create annotated tag: `git tag -a vX.Y.Z -m "..."` → `git push origin main && git push origin vX.Y.Z`. Unprefixed semver `vX.Y.Z` (e.g. `v1.0.0`). One pkg per REPO → no tag prefix → keeps `@v1` major ref clean for Actions MKT.
 - Tag push fires `release.yml` → checkout, `npm ci`, lint, test, build, verify committed `dist/` == fresh rebuild (FAILS on drift), creates GitHub Release (`softprops/action-gh-release`), force-moves major tag `v1` to released commit so `@v1` consumers auto-update.
-- ACT not listed on MKT yet. The FIRST MKT listing needs a one-time manual ToS acceptance in the Release UI; after that, RELs update the listing automatically.
+- ACT listed on MKT since `v1.1.2`. MKT publication of a REL = manual owner step in the Release UI, NOT done by `release.yml` → after each REL check the listing shows the new tag.
 - RELs: see <https://github.com/kochetkov-ma/brewpage-action/releases>. `@v1` = stable consumer ref.
 - MKT metadata REQ in `action.yml`: `name`, `description`, `branding` (cur: `icon: upload-cloud`, `color: purple`). All three mandatory — !=remove.
 
@@ -142,7 +142,7 @@ git tag -a vX.Y.Z -m "..." && git push origin main && git push origin vX.Y.Z
 # + GitHub Release + force-move major tag v1).
 ```
 
-CI (runs on `pull_request` + `workflow_dispatch` only — NO push trigger): `ci.yml` (npm ci + lint + test + build + js-yaml validation), `check-dist.yml` (rebuild + dist/ drift guard). `release.yml` fires on `v*` tag push (build + dist/ drift check + GitHub Release + major-tag move; MKT listing updates only once listed).
+CI (runs on `pull_request` + `workflow_dispatch` only — NO push trigger): `ci.yml` (npm ci + lint + test + build + js-yaml validation), `check-dist.yml` (rebuild + dist/ drift guard). `release.yml` fires on `v*` tag push (build + dist/ drift check + GitHub Release + major-tag move; MKT publication of the REL = separate manual owner step).
 
 ## Links
 
