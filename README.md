@@ -178,7 +178,7 @@ Use this when you just want "publish and keep one stable URL" without tracking t
 - BrewPage -- the platform this action publishes to: <https://brewpage.app>
 - REST API contract / source of truth: <https://github.com/kochetkov-ma/brewpage-openapi>
 - BrewPage Cookbook -- guides, recipes and demos built on BrewPage: <https://github.com/kochetkov-ma/brewpage-cookbook>
-- Brewcode -- the home of the Brew family of developer tools: <https://brewcode.app>
+- brewcode.app -- the home site of the Brew family of developer tools: <https://brewcode.app>
 
 ## Releases (maintainer note)
 
