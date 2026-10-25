@@ -1,6 +1,6 @@
 {
   "name": "brewpage-action",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "description": "Publish CI artefacts to BrewPage from a GitHub workflow in one step.",
   "type": "module",
