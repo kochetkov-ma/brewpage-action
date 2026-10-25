@@ -79,7 +79,9 @@ function makeResponse(ok: boolean, status: number, body: object): Response {
   } as unknown as Response
 }
 
-function makeFetchMock(...responses: object[]): jest.MockedFunction<typeof fetch> {
+function makeFetchMock(
+  ...responses: object[]
+): jest.MockedFunction<typeof fetch> {
   const mock = jest.fn() as jest.MockedFunction<typeof fetch>
   for (const body of responses) {
     mock.mockResolvedValueOnce(makeResponse(true, 200, body))
@@ -87,7 +89,9 @@ function makeFetchMock(...responses: object[]): jest.MockedFunction<typeof fetch
   return mock
 }
 
-function makeFetchMockWithResponse(...responses: Response[]): jest.MockedFunction<typeof fetch> {
+function makeFetchMockWithResponse(
+  ...responses: Response[]
+): jest.MockedFunction<typeof fetch> {
   const mock = jest.fn() as jest.MockedFunction<typeof fetch>
   for (const r of responses) {
     mock.mockResolvedValueOnce(r)
@@ -150,7 +154,11 @@ describe('run() - mode=auto with discovery found', () => {
   // THEN gallery is queried then PUT to /api/html/{ns}/{id}
 
   it('calls PUT /api/html/{ns}/{id} when discovery returns found for html kind', async () => {
-    const galleryItem = { id: 'discovered-id', namespace: 'public', type: 'html' }
+    const galleryItem = {
+      id: 'discovered-id',
+      namespace: 'public',
+      type: 'html'
+    }
     setInputs({
       path: 'report.html',
       'owner-token': 'existing-tok',
@@ -275,8 +283,18 @@ describe('run() - mode=auto with multiple matching resources', () => {
 
   it('warns and PUTs the oldest resource when multiple match', async () => {
     const items = [
-      { id: 'newer', namespace: 'public', type: 'html', createdAt: '2026-04-01T00:00:00Z' },
-      { id: 'older', namespace: 'public', type: 'html', createdAt: '2026-01-01T00:00:00Z' }
+      {
+        id: 'newer',
+        namespace: 'public',
+        type: 'html',
+        createdAt: '2026-04-01T00:00:00Z'
+      },
+      {
+        id: 'older',
+        namespace: 'public',
+        type: 'html',
+        createdAt: '2026-01-01T00:00:00Z'
+      }
     ]
     setInputs({
       path: 'report.html',
@@ -602,7 +620,8 @@ describe('run() - summary action field', () => {
 
     const rawCalls = mockSummary.addRaw.mock.calls
     const createdCall = rawCalls.find(
-      ([text]) => typeof text === 'string' && (text as string).includes('Created')
+      ([text]) =>
+        typeof text === 'string' && (text as string).includes('Created')
     )
     expect(createdCall).toBeDefined()
   })
@@ -625,7 +644,8 @@ describe('run() - summary action field', () => {
 
     const rawCalls = mockSummary.addRaw.mock.calls
     const updatedCall = rawCalls.find(
-      ([text]) => typeof text === 'string' && (text as string).includes('Updated')
+      ([text]) =>
+        typeof text === 'string' && (text as string).includes('Updated')
     )
     expect(updatedCall).toBeDefined()
   })
@@ -663,7 +683,11 @@ describe('run() - read-only old publication', () => {
       mode: 'auto'
     })
     global.fetch = makeFetchMockWithResponse(
-      makeResponse(true, 200, galleryPage([{ id: 'old001', namespace: 'public', type: 'html' }], 1)),
+      makeResponse(
+        true,
+        200,
+        galleryPage([{ id: 'old001', namespace: 'public', type: 'html' }], 1)
+      ),
       makeResponse(false, 409, READ_ONLY),
       makeResponse(true, 200, CREATE_RESPONSE)
     )
@@ -671,7 +695,9 @@ describe('run() - read-only old publication', () => {
     await run()
 
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
-    const methods = fetchMock.mock.calls.map(([, init]) => (init as RequestInit).method)
+    const methods = fetchMock.mock.calls.map(
+      ([, init]) => (init as RequestInit).method
+    )
     expect(methods).toEqual(['GET', 'PUT', 'POST'])
     expect(mockCore.setFailed).not.toHaveBeenCalled()
     expect(mockCore.warning).toHaveBeenCalledWith(
@@ -695,7 +721,9 @@ describe('run() - read-only old publication', () => {
       namespace: 'public',
       'ttl-days': '15'
     })
-    global.fetch = makeFetchMockWithResponse(makeResponse(false, 409, READ_ONLY))
+    global.fetch = makeFetchMockWithResponse(
+      makeResponse(false, 409, READ_ONLY)
+    )
 
     await run()
 
@@ -710,13 +738,25 @@ describe('run() - read-only old publication', () => {
   // WHEN run() creates
   // THEN the request carries ttl=90 for both (max 90)
 
-  it.each([['90'], ['200']])('sends ttl=90 for ttl-days %s', async (ttlDays) => {
-    setInputs({ path: 'report.html', 'owner-token': 'tok', mode: 'create', namespace: 'public', 'ttl-days': ttlDays })
-    global.fetch = makeFetchMockWithResponse(makeResponse(true, 200, CREATE_RESPONSE))
+  it.each([['90'], ['200']])(
+    'sends ttl=90 for ttl-days %s',
+    async (ttlDays) => {
+      setInputs({
+        path: 'report.html',
+        'owner-token': 'tok',
+        mode: 'create',
+        namespace: 'public',
+        'ttl-days': ttlDays
+      })
+      global.fetch = makeFetchMockWithResponse(
+        makeResponse(true, 200, CREATE_RESPONSE)
+      )
 
-    await run()
+      await run()
 
-    const [url] = (global.fetch as jest.MockedFunction<typeof fetch>).mock.calls[0] as [string]
-    expect(new URL(url).searchParams.get('ttl')).toEqual('90')
-  })
+      const [url] = (global.fetch as jest.MockedFunction<typeof fetch>).mock
+        .calls[0] as [string]
+      expect(new URL(url).searchParams.get('ttl')).toEqual('90')
+    }
+  )
 })

@@ -21,9 +21,11 @@ describe('site upload transport', () => {
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'brewpage-action-'))
-    global.fetch = jest.fn<typeof fetch>().mockResolvedValue(
-      new Response(JSON.stringify(response), { status: 200 })
-    )
+    global.fetch = jest
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(JSON.stringify(response), { status: 200 })
+      )
   })
 
   afterEach(async () => {
@@ -35,21 +37,36 @@ describe('site upload transport', () => {
     // GIVEN a directory containing an entry and nested asset.
     await mkdir(join(directory, 'assets'))
     await writeFile(join(directory, 'index.html'), '<h1>Site</h1>')
-    await writeFile(join(directory, 'assets', 'app.js'), 'export const ready = true')
+    await writeFile(
+      join(directory, 'assets', 'app.js'),
+      'export const ready = true'
+    )
     // WHEN publishing the directory using native multipart transport.
     const result = await postSite('https://brewpage.app', {
-      dirOrZip: directory, ns: 'public', ttl: 15, entry: 'index.html',
-      ownerToken: 'owner', password: 'password'
+      dirOrZip: directory,
+      ns: 'public',
+      ttl: 15,
+      entry: 'index.html',
+      ownerToken: 'owner',
+      password: 'password'
     })
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
     // THEN the request includes paired paths and leaves the server response intact.
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('https://brewpage.app/api/sites?ns=public&ttl=15&entry=index.html')
-    expect(init?.headers).toEqual({ 'X-Owner-Token': 'owner', 'X-Password': 'password' })
+    expect(url).toBe(
+      'https://brewpage.app/api/sites?ns=public&ttl=15&entry=index.html'
+    )
+    expect(init?.headers).toEqual({
+      'X-Owner-Token': 'owner',
+      'X-Password': 'password'
+    })
     const form = init?.body as FormData
     expect(form.getAll('paths')).toEqual(['assets/app.js', 'index.html'])
-    expect(form.getAll('files').map(value => (value as File).name)).toEqual(['app.js', 'index.html'])
+    expect(form.getAll('files').map((value) => (value as File).name)).toEqual([
+      'app.js',
+      'index.html'
+    ])
     expect(form.getAll('archive')).toEqual([])
     expect(result).toEqual(response)
   })
@@ -60,7 +77,10 @@ describe('site upload transport', () => {
     await writeFile(archive, Buffer.from([80, 75, 3, 4]))
     // WHEN updating the site with a requested TTL.
     const result = await putSite('https://brewpage.app', {
-      dirOrZip: archive, ns: 'public', id: 'site001', ttl: 30,
+      dirOrZip: archive,
+      ns: 'public',
+      id: 'site001',
+      ttl: 30,
       ownerToken: 'owner'
     })
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
@@ -70,7 +90,9 @@ describe('site upload transport', () => {
     expect(url).toBe('https://brewpage.app/api/sites/public/site001?ttl=30')
     expect(init?.method).toBe('PUT')
     const form = init?.body as FormData
-    expect(form.getAll('archive').map(value => (value as File).name)).toEqual(['site.zip'])
+    expect(form.getAll('archive').map((value) => (value as File).name)).toEqual(
+      ['site.zip']
+    )
     expect(form.getAll('files')).toEqual([])
     expect(form.getAll('paths')).toEqual([])
     expect(result).toEqual(response)
@@ -81,11 +103,20 @@ describe('site upload transport', () => {
     const archive = join(directory, 'site.zip')
     await writeFile(archive, 'invalid')
     global.fetch = jest.fn<typeof fetch>().mockResolvedValue(
-      new Response('{"error":"Invalid archive"}', { status: 400, statusText: 'Bad Request' })
+      new Response('{"error":"Invalid archive"}', {
+        status: 400,
+        statusText: 'Bad Request'
+      })
     )
     // WHEN publishing the rejected archive.
-    const request = postSite('https://brewpage.app', { dirOrZip: archive, ns: 'public', ttl: 15 })
+    const request = postSite('https://brewpage.app', {
+      dirOrZip: archive,
+      ns: 'public',
+      ttl: 15
+    })
     // THEN the action exposes the actionable HTTP error.
-    await expect(request).rejects.toThrow('postSite failed: HTTP 400 Bad Request {"error":"Invalid archive"}')
+    await expect(request).rejects.toThrow(
+      'postSite failed: HTTP 400 Bad Request {"error":"Invalid archive"}'
+    )
   })
 })

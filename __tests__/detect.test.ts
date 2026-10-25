@@ -42,7 +42,9 @@ describe('detectKind', () => {
     // THEN kind is site
 
     it('returns site when path is a directory', () => {
-      mockStatSync.mockReturnValue({ isDirectory: () => true } as ReturnType<typeof statSync>)
+      mockStatSync.mockReturnValue({ isDirectory: () => true } as ReturnType<
+        typeof statSync
+      >)
 
       const result = detectKind('/some/dir', 'auto')
 
@@ -72,7 +74,9 @@ describe('detectKind', () => {
     // THEN kind is html
 
     it('returns html for .html extension', () => {
-      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<typeof statSync>)
+      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<
+        typeof statSync
+      >)
 
       const result = detectKind('index.html', 'auto')
 
@@ -80,7 +84,9 @@ describe('detectKind', () => {
     })
 
     it('returns html for .htm extension', () => {
-      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<typeof statSync>)
+      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<
+        typeof statSync
+      >)
 
       const result = detectKind('index.htm', 'auto')
 
@@ -88,7 +94,9 @@ describe('detectKind', () => {
     })
 
     it('returns html for .HTML extension (uppercase)', () => {
-      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<typeof statSync>)
+      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<
+        typeof statSync
+      >)
 
       const result = detectKind('INDEX.HTML', 'auto')
 
@@ -102,7 +110,9 @@ describe('detectKind', () => {
     // THEN kind is markdown
 
     it('returns markdown for .md extension', () => {
-      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<typeof statSync>)
+      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<
+        typeof statSync
+      >)
 
       const result = detectKind('README.md', 'auto')
 
@@ -110,7 +120,9 @@ describe('detectKind', () => {
     })
 
     it('returns markdown for .markdown extension', () => {
-      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<typeof statSync>)
+      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<
+        typeof statSync
+      >)
 
       const result = detectKind('doc.markdown', 'auto')
 
@@ -124,7 +136,9 @@ describe('detectKind', () => {
     // THEN kind is file
 
     it('returns file for unrecognised extension', () => {
-      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<typeof statSync>)
+      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<
+        typeof statSync
+      >)
 
       const result = detectKind('artifact.tar.gz', 'auto')
 
@@ -132,7 +146,9 @@ describe('detectKind', () => {
     })
 
     it('returns file for extension-less path that is not a directory', () => {
-      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<typeof statSync>)
+      mockStatSync.mockReturnValue({ isDirectory: () => false } as ReturnType<
+        typeof statSync
+      >)
 
       const result = detectKind('somebinary', 'auto')
 
@@ -181,7 +197,9 @@ describe('repoNamespace', () => {
     })
 
     it('trims to 32 characters maximum and strips trailing dashes', () => {
-      const longSlug = repoNamespace('organization/some-very-long-repository-name-exceeding-limit')
+      const longSlug = repoNamespace(
+        'organization/some-very-long-repository-name-exceeding-limit'
+      )
       expect(longSlug.length).toEqual(32)
       expect(longSlug).toEqual('organization-some-very-long-repo')
     })

@@ -33,7 +33,10 @@ describe('buildSummary', () => {
 
       await buildSummary(mockCore, data)
 
-      expect(mockSummary.addHeading).toHaveBeenCalledWith('Published to BrewPage', 2)
+      expect(mockSummary.addHeading).toHaveBeenCalledWith(
+        'Published to BrewPage',
+        2
+      )
       expect(mockSummary.addLink).toHaveBeenCalledWith(data.link, data.link)
     })
 
@@ -111,7 +114,10 @@ describe('buildSummary', () => {
 
       await buildSummary(mockCore, data)
 
-      expect(mockSummary.addLink).toHaveBeenCalledWith('https://brewpage.app', 'https://brewpage.app')
+      expect(mockSummary.addLink).toHaveBeenCalledWith(
+        'https://brewpage.app',
+        'https://brewpage.app'
+      )
     })
   })
 
