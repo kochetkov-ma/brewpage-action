@@ -71,7 +71,7 @@ Use this for a quick one-off preview. You pass only `path` (and optionally `kind
 
 This is the one-time prerequisite for scenarios 3 and 4. It is not an action call of its own -- just get a token and store it as the repo secret `BREWPAGE_OWNER_TOKEN`. The `owner-token` is the only credential that can update or delete the resource on [brewpage.app](https://brewpage.app); lose it and the resource is unmanageable.
 
-Optional: sign in at <https://account.brewpage.app> to manage your pages and tokens from any device. Not required.
+Optional: sign in free (Google or any email) at <https://account.brewpage.app> to never lose your pages or tokens and to mint tokens that never expire. Not needed to publish.
 
 **Option A -- mint a token directly and paste it into a secret:**
 

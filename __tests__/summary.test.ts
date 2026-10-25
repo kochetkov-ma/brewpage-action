@@ -163,7 +163,7 @@ describe('buildSummary', () => {
       const texts = mockSummary.addRaw.mock.calls.map(([text]) => text)
       expect(texts).toEqual([
         'Created resource on BrewPage',
-        '> [!TIP]\n> Optional: sign in at https://account.brewpage.app to manage your pages and tokens from any device. Not required.',
+        '> [!TIP]\n> Optional: sign in free (Google or any email) at https://account.brewpage.app to never lose your pages or tokens and to mint tokens that never expire. Not needed to publish.',
         'Powered by '
       ])
     })
