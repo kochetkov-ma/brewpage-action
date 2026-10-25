@@ -656,7 +656,7 @@ describe('run() - summary action field', () => {
 describe('run() - read-only old publication', () => {
   const READ_ONLY = {
     code: 'OLD_PUBLICATION_READ_ONLY',
-    republishUrl: 'https://brewpage.app/api/html?ns=public'
+    republishUrl: 'https://brewpage.app/?republish=public/old001'
   }
 
   beforeEach(() => {
@@ -701,7 +701,7 @@ describe('run() - read-only old publication', () => {
     expect(methods).toEqual(['GET', 'PUT', 'POST'])
     expect(mockCore.setFailed).not.toHaveBeenCalled()
     expect(mockCore.warning).toHaveBeenCalledWith(
-      'Resource public/old001 is read-only (old publication); creating a new one instead. Republish URL: https://brewpage.app/api/html?ns=public'
+      'Resource public/old001 is read-only (old publication); creating a new one instead. Republish URL: https://brewpage.app/?republish=public/old001'
     )
     const notes = mockSummary.addRaw.mock.calls.map(([text]) => text)
     expect(notes).toContain(
@@ -711,9 +711,9 @@ describe('run() - read-only old publication', () => {
 
   // GIVEN a pinned update-id whose PUT answers 409 read-only
   // WHEN run() is called
-  // THEN the step fails with the republishUrl and nothing is created
+  // THEN the step fails with an actionable update-id hint and nothing is created
 
-  it('fails with the republishUrl when update-id is pinned', async () => {
+  it('fails with an update-id hint when update-id is pinned', async () => {
     setInputs({
       path: 'report.html',
       'owner-token': 'existing-tok',
@@ -730,7 +730,7 @@ describe('run() - read-only old publication', () => {
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(mockCore.setFailed).toHaveBeenCalledWith(
-      'putHtml failed: the publication is read-only (OLD_PUBLICATION_READ_ONLY). Republish at https://brewpage.app/api/html?ns=public'
+      'Old publication (pre-2.0) is read-only: remove update-id (mode auto creates a new one) or point it at a new publication.'
     )
   })
 

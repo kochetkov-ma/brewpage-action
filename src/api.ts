@@ -36,6 +36,8 @@ export interface GalleryItem {
   views?: number
   visibility?: string
   namespace: string
+  // 'old' = pre-2.0 publication: read-only, never a discovery target.
+  routingCohort?: string
 }
 
 interface GalleryPage {
@@ -105,7 +107,11 @@ export async function discoverOwnResource(
       const body = (await response.json()) as GalleryPage
       const items = Array.isArray(body.items) ? body.items : []
       for (const item of items) {
-        if (item.namespace === ns && matchesKind(item.type, kind)) {
+        if (
+          item.namespace === ns &&
+          item.routingCohort !== 'old' &&
+          matchesKind(item.type, kind)
+        ) {
           matches.push(item)
         }
       }

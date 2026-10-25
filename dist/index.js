@@ -30498,7 +30498,9 @@ async function discoverOwnResource(baseUrl, ownerToken, ns, kind) {
             const body = (await response.json());
             const items = Array.isArray(body.items) ? body.items : [];
             for (const item of items) {
-                if (item.namespace === ns && matchesKind(item.type, kind)) {
+                if (item.namespace === ns &&
+                    item.routingCohort !== 'old' &&
+                    matchesKind(item.type, kind)) {
                     matches.push(item);
                 }
             }
@@ -30985,8 +30987,12 @@ async function publish(args) {
             }
         }
         catch (error) {
-            if (!(error instanceof OldPublicationReadOnlyError) || !discovered) {
+            if (!(error instanceof OldPublicationReadOnlyError)) {
                 throw error;
+            }
+            if (!discovered) {
+                throw new Error('Old publication (pre-2.0) is read-only: remove update-id (mode auto creates a new one) ' +
+                    'or point it at a new publication.', { cause: error });
             }
             replacedId = updateId;
             warning(`Resource ${namespace}/${updateId} is read-only (old publication); creating a new one instead.` +

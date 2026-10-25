@@ -253,8 +253,15 @@ async function publish(args: PublishArgs): Promise<Result> {
         return updated
       }
     } catch (error) {
-      if (!(error instanceof OldPublicationReadOnlyError) || !discovered) {
+      if (!(error instanceof OldPublicationReadOnlyError)) {
         throw error
+      }
+      if (!discovered) {
+        throw new Error(
+          'Old publication (pre-2.0) is read-only: remove update-id (mode auto creates a new one) ' +
+            'or point it at a new publication.',
+          { cause: error }
+        )
       }
       replacedId = updateId
       core.warning(
