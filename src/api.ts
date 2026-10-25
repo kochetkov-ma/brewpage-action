@@ -36,7 +36,7 @@ export interface GalleryItem {
   views?: number
   visibility?: string
   namespace: string
-  // 'old' = pre-2.0 publication: read-only, never a discovery target.
+  // 'old' = created before the new link format: read-only, never a discovery target.
   routingCohort?: string
 }
 
