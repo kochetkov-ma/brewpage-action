@@ -15,7 +15,7 @@ inputs:
     required: false
     default: 'auto'
   namespace:
-    description: 'Empty (default): a per-repo namespace derived from github.repository (e.g. octo-org-my-repo), unlisted and not indexed; anyone who has the link can still open it. "public": the page is listed in the public gallery and the sitemap, so Google, Bing and AI search can find and index it and people can discover it. Use it for anything meant to be found or shared: docs, guides, demos, portfolios, reports, landing pages. Anyone can find and read a public page: never put secrets, tokens or personal data there. Changing the namespace starts a new publication (mode auto).'
+    description: 'Empty (default): a per-repo namespace derived from github.repository (e.g. octo-org-my-repo), unlisted and not indexed; anyone who has the link can still open it. "public": public pages, sites and files are listed in the public gallery and the sitemap, so Google, Bing and AI search can find and index them and people can discover them. Use it for anything meant to be found or shared: docs, guides, demos, portfolios, reports, landing pages. Anyone can find and read a public page: never put secrets, tokens or personal data there. Changing the namespace starts a new publication (mode auto).'
     required: false
     default: ''
   password:

@@ -730,7 +730,7 @@ describe('run() - read-only old publication', () => {
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(mockCore.setFailed).toHaveBeenCalledWith(
-      'Old publication public/old001 (created before the new link format) is read-only: remove update-id (mode auto creates a new one) or point it at a new publication.'
+      'Old publication public/old001 (made before 5 October 2026) is read-only: remove update-id (mode auto creates a new one) or point it at a new publication.'
     )
   })
 
@@ -762,7 +762,7 @@ describe('run() - read-only old publication', () => {
     ).mock.calls.map(([, init]) => (init as RequestInit).method)
     expect(methods).toEqual(['GET', 'PUT'])
     expect(mockCore.setFailed).toHaveBeenCalledWith(
-      'Old publication public/old001 (created before the new link format) is read-only: use mode auto (creates a new one) or set update-id to a new publication.'
+      'Old publication public/old001 (made before 5 October 2026) is read-only: use mode auto (creates a new one) or set update-id to a new publication.'
     )
   })
 

@@ -14,7 +14,7 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 |-------|----------|---------|-------------|
 | `path` | yes | -- | File, directory, or `.zip` to publish to [brewpage.app](https://brewpage.app). |
 | `kind` | no | `auto` | Artefact kind: `html`, `markdown`, `site`, `file`, or `auto`. |
-| `namespace` | no | _(empty)_ | Empty (default): a per-repo namespace derived from `github.repository` (e.g. `octo-org-my-repo`), unlisted and not indexed. `public`: listed in the gallery and the sitemap, so Google, Bing and AI search can find and index it; anyone can find and read it. See [Public or unlisted](#public-or-unlisted). |
+| `namespace` | no | _(empty)_ | Empty (default): a per-repo namespace derived from `github.repository` (e.g. `octo-org-my-repo`), unlisted and not indexed. `public`: public pages, sites and files are listed in the public gallery and the sitemap, so Google, Bing and AI search can find and index them; anyone can find and read it. See [Public or unlisted](#public-or-unlisted). |
 | `password` | no | _(empty)_ | Optional access password; protected resources are hidden from the gallery. NEW browser links stay clean and unlock through `unlock.brewpage.app`; password protection does not select delivery mode. |
 | `ttl-days` | no | `15` | Requested creation TTL in days (1..90), subject to account limits. PUT retains the original expiry; use the returned `expires-at`. |
 | `tags` | no | _(empty)_ | Comma-separated tags used for search and grouping on [brewpage.app](https://brewpage.app). |
@@ -39,7 +39,7 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 
 ## Public or unlisted
 
-- **`namespace: public`**: the page is listed in the public gallery and the sitemap, so Google, Bing and AI search can find and index it and people can discover it. Use it for anything meant to be found or shared: docs, guides, demos, portfolios, reports, landing pages. Anyone can find and read a public page: never put secrets, tokens or personal data there.
+- **`namespace: public`**: public pages, sites and files are listed in the public gallery and the sitemap, so Google, Bing and AI search can find and index them and people can discover them. Use it for anything meant to be found or shared: docs, guides, demos, portfolios, reports, landing pages. Anyone can find and read a public page: never put secrets, tokens or personal data there.
 - **`namespace` empty (default)**: the action publishes to a per-repo namespace derived from `github.repository` (e.g. `octo-org-my-repo`). It is unlisted and not indexed; anyone who has the link can still open it. Use `password` to restrict access.
 - Any other value is a custom namespace and behaves like the default. Discovery is per namespace, so changing it starts a new publication (`mode: auto`).
 
@@ -120,7 +120,7 @@ Use this when you already created the resource (manually or in an earlier run) a
 
 **Requests made:** exactly one -- `PUT /api/{html|sites}/{ns}/{id}` with header `X-Owner-Token`. No mint, no gallery discovery (`update-id` short-circuits everything).
 
-**What happens:** the content is replaced in place at the same URL on [brewpage.app](https://brewpage.app). The `owner-token` must own the resource (otherwise `403`), and `ns`+`id` must already exist (otherwise `404` -- `PUT` does not create). Files are immutable: `kind: file` has no `PUT`, so a new resource is created instead. A read-only old publication (created before the new link format) answers `409` (`OLD_PUBLICATION_READ_ONLY`): the step fails and asks you to remove `update-id` (`mode: auto` then creates a new resource) or point it at a new publication.
+**What happens:** the content is replaced in place at the same URL on [brewpage.app](https://brewpage.app). The `owner-token` must own the resource (otherwise `403`), and `ns`+`id` must already exist (otherwise `404` -- `PUT` does not create). Files are immutable: `kind: file` has no `PUT`, so a new resource is created instead. An old publication (made before 5 October 2026) is read-only and answers `409` (`OLD_PUBLICATION_READ_ONLY`): the step fails and asks you to remove `update-id` (`mode: auto` then creates a new resource) or point it at a new publication.
 
 ### 4. Full-auto redeploy (most automatic, one extra request)
 
@@ -139,7 +139,7 @@ Use this when you just want "publish and keep one stable URL" without tracking t
 
 **Requests made:** `GET /api/gallery?mine=true` with header `X-Owner-Token` (discovers your resource by namespace+kind), then `PUT` if one is found, or a `POST` create on the first run.
 
-**What happens:** the first run finds nothing and creates the resource; every later run finds it and `PUT`s over it -- same URL on [brewpage.app](https://brewpage.app). Old publications (created before the new link format) are read-only and never matched, so the first run after the switch creates a new resource and later runs update that one. If several resources match the same namespace+kind, it updates the oldest and warns (pass `update-id`, scenario 3, to be explicit). Files always create (immutable). A freshly minted token skips discovery.
+**What happens:** the first run finds nothing and creates the resource; every later run finds it and `PUT`s over it -- same URL on [brewpage.app](https://brewpage.app). Old publications (made before 5 October 2026) are read-only and never matched, so the first run creates a new resource and later runs update that one. If several resources match the same namespace+kind, it updates the oldest and warns (pass `update-id`, scenario 3, to be explicit). Files always create (immutable). A freshly minted token skips discovery.
 
 ```
   mint owner-token once          (GET /api/owner-token, or read run #1 output)
