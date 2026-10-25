@@ -41,7 +41,7 @@ Flow: `inputs → mint-or-reuse OT (setSecret) → detect kind + resolve NS → 
 |-------|-----|---------|-------------|
 | `path` | yes | — | File, dir, or `.zip` to publish. |
 | `kind` | no | `auto` | `html` \| `markdown` \| `site` \| `file` \| `auto` |
-| `namespace` | no | _(empty)_ | Empty derives per-repo slug from `github.repository`. Unprotected `public` resources are gallery-eligible; custom NS unlisted. NEW sites/native hosts: `noindex`. |
+| `namespace` | no | _(empty)_ | Empty derives per-repo slug from `github.repository` (custom NS: unlisted, noindex, link still opens). `public`: gallery, Google/Bing/AI search indexing, sitemap; anyone can read it, no secrets/personal data. Copy: `README.md` Public or unlisted. |
 | `password` | no | _(empty)_ | Access password; protected resource hidden from gallery. Independent of NS/delivery mode; NEW browser links use clean trusted unlock. |
 | `ttl-days` | no | `15` | TTL in days (1..90; server clamps by account). |
 | `tags` | no | _(empty)_ | Comma-separated tags. |
@@ -74,7 +74,7 @@ Update routing handled in TS (`src/main.ts`, `resolveTargetId` + `publish`):
 ### Hard rules — !=regress
 
 1. **Mask OT before writing anywhere.** Call `core.setSecret(ownerToken)` BEFORE `core.setOutput('owner-token', ...)` and before any log/summary line that could contain it. Masking only redacts output emitted AFTER the `setSecret` call. OT = only credential that can manage/delete/republish a resource — leaking | losing it → resource unmanageable forever.
-2. **Preserve hosting/access contract.** NS, password, delivery mode and indexation are independent. Unprotected `public` resources are gallery-eligible; custom NS unlisted, not access-protected. NEW sites/native hosts are `noindex`. NEW sites/non-public NS require subdomains; public non-sites default to Promotion even with passwords. This ACT uses server defaults; `mode` selects publish operation only.
+2. **Preserve hosting/access contract.** NS, password, delivery mode and indexation are independent. Unprotected `public` resources are gallery- and index-eligible; custom NS unlisted, `noindex`, not access-protected. Never call it secure (use `password`). NEW sites/non-public NS require subdomains; public non-sites default to Promotion even with passwords. This ACT uses server defaults; `mode` selects publish operation only.
 3. **Preserve server links exactly.** Pass response `link` unchanged to output/summary; !=derive hosts from IDs or append NEW passwords. NEW protected browser links use top-level `unlock.brewpage.app`; automated reads use apex `X-Password`. Owner/API links stay apex; all OLD behavior/links unchanged. Keep `action.yml` + `README.md` aligned with SPEC.
 
 `@actions/core` (`setOutput`) writes `$GITHUB_OUTPUT`. !=deprecated `::set-output::` WF cmd.
