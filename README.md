@@ -14,7 +14,7 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 |-------|----------|---------|-------------|
 | `path` | yes | -- | File, directory, or `.zip` to publish to [brewpage.app](https://brewpage.app). |
 | `kind` | no | `auto` | Artefact kind: `html`, `markdown`, `site`, `file`, or `auto`. |
-| `namespace` | no | _(empty)_ | Empty (default): a per-repo namespace derived from `github.repository` (e.g. `octo-org-my-repo`), unlisted and not indexed. `public`: listed in the gallery, can be indexed by Google, Bing and AI search (and appear in the sitemap); anyone can find and read it. Use a longer `ttl-days` (e.g. `90`) to stay discoverable. See [Public or unlisted](#public-or-unlisted). |
+| `namespace` | no | _(empty)_ | Empty (default): a per-repo namespace derived from `github.repository` (e.g. `octo-org-my-repo`), unlisted and not indexed. `public`: listed in the gallery and the sitemap, so Google, Bing and AI search can find and index it; anyone can find and read it. See [Public or unlisted](#public-or-unlisted). |
 | `password` | no | _(empty)_ | Optional access password; protected resources are hidden from the gallery. NEW browser links stay clean and unlock through `unlock.brewpage.app`; password protection does not select delivery mode. |
 | `ttl-days` | no | `15` | Requested creation TTL in days (1..90), subject to account limits. PUT retains the original expiry; use the returned `expires-at`. |
 | `tags` | no | _(empty)_ | Comma-separated tags used for search and grouping on [brewpage.app](https://brewpage.app). |
@@ -39,7 +39,7 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 
 ## Public or unlisted
 
-- **`namespace: public`**: the page is listed in the public gallery and can be indexed by Google, Bing and AI search (and appear in the sitemap), so people can discover it; a longer TTL keeps it discoverable longer. Set `ttl-days: 90` on the first publish: updates keep the original expiry. Use it for anything meant to be found or shared: docs, guides, demos, portfolios, reports, landing pages. Anyone can find and read a public page: never put secrets, tokens or personal data there.
+- **`namespace: public`**: the page is listed in the public gallery and the sitemap, so Google, Bing and AI search can find and index it and people can discover it. Use it for anything meant to be found or shared: docs, guides, demos, portfolios, reports, landing pages. Anyone can find and read a public page: never put secrets, tokens or personal data there.
 - **`namespace` empty (default)**: the action publishes to a per-repo namespace derived from `github.repository` (e.g. `octo-org-my-repo`). It is unlisted and not indexed; anyone who has the link can still open it. Use `password` to restrict access.
 - Any other value is a custom namespace and behaves like the default. Discovery is per namespace, so changing it starts a new publication (`mode: auto`).
 

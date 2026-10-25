@@ -41,7 +41,7 @@ Flow: `inputs → mint-or-reuse OT (setSecret) → detect kind + resolve NS → 
 |-------|-----|---------|-------------|
 | `path` | yes | — | File, dir, or `.zip` to publish. |
 | `kind` | no | `auto` | `html` \| `markdown` \| `site` \| `file` \| `auto` |
-| `namespace` | no | _(empty)_ | Empty derives per-repo slug from `github.repository` (custom NS: unlisted, noindex, link still opens). `public`: gallery, can be indexed by Google/Bing/AI search (and sitemap), longer TTL helps; anyone can read it, no secrets/personal data. Copy: `README.md` Public or unlisted. |
+| `namespace` | no | _(empty)_ | Empty derives per-repo slug from `github.repository` (custom NS: unlisted, noindex, link still opens). `public`: gallery + sitemap, Google/Bing/AI search can index it; anyone can read it, no secrets/personal data. Copy: `README.md` Public or unlisted. |
 | `password` | no | _(empty)_ | Access password; protected resource hidden from gallery. Independent of NS/delivery mode; NEW browser links use clean trusted unlock. |
 | `ttl-days` | no | `15` | TTL in days (1..90; server clamps by account). |
 | `tags` | no | _(empty)_ | Comma-separated tags. |
