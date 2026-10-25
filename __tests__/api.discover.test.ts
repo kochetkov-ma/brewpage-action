@@ -119,7 +119,7 @@ describe('discoverOwnResource - none', () => {
 // --- discoverOwnResource: old rows skipped ----------------------------------
 
 describe('discoverOwnResource - old publications skipped', () => {
-  // GIVEN gallery rows where routingCohort 'old' marks read-only old-link-format publications
+  // GIVEN gallery rows where routingCohort 'old' marks read-only publications made before 5 October 2026
   // WHEN discoverOwnResource is called
   // THEN old rows never match, so the new row wins or nothing is found
 

@@ -30973,7 +30973,7 @@ async function resolveTargetId(args) {
         if (mode === 'update') {
             throw new Error(`mode=update requires an existing resource, but none could be resolved for ` +
                 `namespace "${namespace}" and kind "${kind}"; old publications ` +
-                '(created before the new link format) are read-only and skipped (set update-id or use mode=auto).');
+                '(made before 5 October 2026) are read-only and skipped (set update-id or use mode=auto).');
         }
     }
     return { discovered: false };
@@ -30994,7 +30994,7 @@ async function publish(args) {
             }
             // Only mode=auto may replace a read-only target; pinned update-id and mode=update fail.
             if (!discovered || mode !== 'auto') {
-                throw new Error(`Old publication ${namespace}/${updateId} (created before the new link format) is read-only: ` +
+                throw new Error(`Old publication ${namespace}/${updateId} (made before 5 October 2026) is read-only: ` +
                     (discovered
                         ? 'use mode auto (creates a new one) or set update-id to a new publication.'
                         : 'remove update-id (mode auto creates a new one) or point it at a new publication.'), { cause: error });
