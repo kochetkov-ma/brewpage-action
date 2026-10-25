@@ -116,6 +116,47 @@ describe('discoverOwnResource - none', () => {
   })
 })
 
+// --- discoverOwnResource: old rows skipped ----------------------------------
+
+describe('discoverOwnResource - old publications skipped', () => {
+  // GIVEN gallery rows where routingCohort 'old' marks read-only old-link-format publications
+  // WHEN discoverOwnResource is called
+  // THEN old rows never match, so the new row wins or nothing is found
+
+  const OLD = {
+    id: 'old001',
+    namespace: 'public',
+    type: 'html',
+    routingCohort: 'old',
+    createdAt: '2026-01-01T00:00:00Z'
+  }
+  const NEW = {
+    id: 'new001',
+    namespace: 'public',
+    type: 'html',
+    routingCohort: 'new-v1',
+    createdAt: '2026-10-01T00:00:00Z'
+  }
+
+  it.each([
+    ['old + new', [OLD, NEW], { status: 'found', id: 'new001' }],
+    ['only old', [OLD], { status: 'none' }]
+  ])('skips old rows: %s', async (_label, items, expected) => {
+    global.fetch = makeFetch(
+      makeResponse(true, 200, galleryPage(items, items.length))
+    )
+
+    const result = await discoverOwnResource(
+      'https://brewpage.app',
+      'owner-tok',
+      'public',
+      'html'
+    )
+
+    expect(result).toEqual(expected)
+  })
+})
+
 // --- discoverOwnResource: multiple matches pick oldest -----------------------
 
 describe('discoverOwnResource - multiple matches pick oldest', () => {

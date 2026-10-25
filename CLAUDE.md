@@ -55,7 +55,7 @@ Flow: `inputs → mint-or-reuse OT (setSecret) → detect kind + resolve NS → 
 
 Update routing handled in TS (`src/main.ts`, `resolveTargetId` + `publish`):
 - **Target-id resolution.** `update-id` set → use it (always wins). `mode=create` → no target (POST). `mode=auto` + freshly minted OT → skip discovery (new token owns nothing → POST). `mode=auto`|`update` with a persisted OT → discover-by-owner. `mode=update` with no resolvable id → fail fast.
-- **Discover-by-owner.** `discoverOwnResource` calls `GET /api/gallery?mine=true` (OT-scoped), filters to the resolved NS + artefact kind. Exactly one match → its id (→ PUT). Zero → POST create. Ambiguous (>1) → warn + POST create (caller must pass `update-id` to disambiguate).
+- **Discover-by-owner.** `discoverOwnResource` calls `GET /api/gallery?mine=true` (OT-scoped), filters to the resolved NS + artefact kind, skipping `routingCohort: old` rows (created before the new link format, read-only). Exactly one match → its id (→ PUT). Zero → POST create. Ambiguous (>1) → warn + PUT the oldest match (caller passes `update-id` to target another). Discovered target 409 read-only → `mode=auto` creates a new one; `mode=update` fails.
 - **PUT vs POST.** Resolved target id present → PUT (`putSite` / `putHtml`); else POST (`postSite` / `postHtml` / `postFile`).
 - **Files immutable.** No PUT for `/api/files`; a `file` artefact always creates a new resource even if a target id was resolved (warns).
 - **NS scope.** Discovery is bounded by the deterministic per-repo NS (from `github.repository`) + kind, so each repo+kind maps to its own auto-republished resource.
