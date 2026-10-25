@@ -112,6 +112,7 @@ export async function run(): Promise<void> {
 
     const result = await publish({
       kind,
+      mode,
       updateId: target.id,
       discovered: target.discovered,
       path,
@@ -219,7 +220,8 @@ async function resolveTargetId(args: ResolveTargetArgs): Promise<Target> {
     if (mode === 'update') {
       throw new Error(
         `mode=update requires an existing resource, but none could be resolved for ` +
-          `namespace "${namespace}" and kind "${kind}" (set update-id or use mode=auto).`
+          `namespace "${namespace}" and kind "${kind}"; old pre-2.0 publications are ` +
+          'read-only and skipped (set update-id or use mode=auto).'
       )
     }
   }
@@ -229,6 +231,7 @@ async function resolveTargetId(args: ResolveTargetArgs): Promise<Target> {
 
 interface PublishArgs {
   kind: Kind
+  mode: Mode
   updateId?: string
   discovered: boolean
   path: string
@@ -243,7 +246,7 @@ interface PublishArgs {
 }
 
 async function publish(args: PublishArgs): Promise<Result> {
-  const { updateId, discovered, namespace } = args
+  const { mode, updateId, discovered, namespace } = args
 
   let replacedId: string | undefined
   if (updateId !== undefined) {
@@ -256,10 +259,13 @@ async function publish(args: PublishArgs): Promise<Result> {
       if (!(error instanceof OldPublicationReadOnlyError)) {
         throw error
       }
-      if (!discovered) {
+      // Only mode=auto may replace a read-only target; pinned update-id and mode=update fail.
+      if (!discovered || mode !== 'auto') {
         throw new Error(
-          'Old publication (pre-2.0) is read-only: remove update-id (mode auto creates a new one) ' +
-            'or point it at a new publication.',
+          `Old publication ${namespace}/${updateId} (pre-2.0) is read-only: ` +
+            (discovered
+              ? 'use mode auto (creates a new one) or set update-id to a new publication.'
+              : 'remove update-id (mode auto creates a new one) or point it at a new publication.'),
           { cause: error }
         )
       }

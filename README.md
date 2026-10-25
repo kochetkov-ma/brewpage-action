@@ -39,7 +39,7 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 
 ## Hosting and access
 
-NEW publications carry `routingCohort=new-v1`; existing OLD publications retain their behavior and URLs. Every NEW site uses one dedicated publication host for its complete bundle. NEW resources in custom namespaces also require a dedicated host. NEW public non-sites default to Promotion on the main BrewPage URL; password protection does not force a dedicated host. This action uses server defaults and exposes no delivery-mode input; its `mode` input controls create/update operations.
+NEW publications carry `routingCohort=new-v1`; existing OLD publications keep their URLs and are read-only. Every NEW site uses one dedicated publication host for its complete bundle. NEW resources in custom namespaces also require a dedicated host. NEW public non-sites default to Promotion on the main BrewPage URL; password protection does not force a dedicated host. This action uses server defaults and exposes no delivery-mode input; its `mode` input controls create/update operations.
 
 Namespace, password protection, delivery mode and search indexation are independent. Unprotected `public` resources are eligible for the gallery. Custom namespaces are unlisted, but an unlisted link alone does not restrict access. A password protects access and hides the resource from the gallery in either namespace. Eligible public HTML, sites and files may receive `X-Robots-Tag: all` on native hosts; unlisted, protected or otherwise ineligible responses retain `noindex, nofollow`. Crawler access restrictions apply separately; `public` does not guarantee search indexing or ranking.
 

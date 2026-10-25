@@ -730,7 +730,39 @@ describe('run() - read-only old publication', () => {
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(mockCore.setFailed).toHaveBeenCalledWith(
-      'Old publication (pre-2.0) is read-only: remove update-id (mode auto creates a new one) or point it at a new publication.'
+      'Old publication public/old001 (pre-2.0) is read-only: remove update-id (mode auto creates a new one) or point it at a new publication.'
+    )
+  })
+
+  // GIVEN mode=update discovered a resource whose PUT answers 409 read-only
+  // WHEN run() is called
+  // THEN the step fails without creating a new resource
+
+  it('fails without creating when mode=update hits a read-only target', async () => {
+    setInputs({
+      path: 'report.html',
+      'owner-token': 'existing-tok',
+      namespace: 'public',
+      'ttl-days': '15',
+      mode: 'update'
+    })
+    global.fetch = makeFetchMockWithResponse(
+      makeResponse(
+        true,
+        200,
+        galleryPage([{ id: 'old001', namespace: 'public', type: 'html' }], 1)
+      ),
+      makeResponse(false, 409, READ_ONLY)
+    )
+
+    await run()
+
+    const methods = (
+      global.fetch as jest.MockedFunction<typeof fetch>
+    ).mock.calls.map(([, init]) => (init as RequestInit).method)
+    expect(methods).toEqual(['GET', 'PUT'])
+    expect(mockCore.setFailed).toHaveBeenCalledWith(
+      'Old publication public/old001 (pre-2.0) is read-only: use mode auto (creates a new one) or set update-id to a new publication.'
     )
   })
 
