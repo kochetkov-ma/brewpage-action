@@ -23,7 +23,7 @@ inputs:
     required: false
     default: ''
   ttl-days:
-    description: 'Requested creation TTL in days (1..30), subject to owner limits. PUT retains the original expiry.'
+    description: 'Requested creation TTL in days (1..90), subject to account limits. PUT retains the original expiry.'
     required: false
     default: '15'
   tags:
@@ -31,7 +31,7 @@ inputs:
     required: false
     default: ''
   owner-token:
-    description: 'X-Owner-Token for the resource. Empty auto-mints a token that is surfaced in the job summary -- persist it as a secret for redeploys.'
+    description: 'X-Owner-Token: one from an earlier run or from your profile. Empty auto-mints a token surfaced in the job summary; persist it as a secret.'
     required: false
     default: ''
   mode:

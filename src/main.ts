@@ -5,6 +5,7 @@ import {
   mintToken,
   postFile,
   postHtml,
+  OldPublicationReadOnlyError,
   postSite,
   putHtml,
   putSite,
@@ -17,7 +18,7 @@ import { buildSummary } from './summary.js'
 
 const DEFAULT_BASE_URL = 'https://brewpage.app'
 const MIN_TTL = 1
-const MAX_TTL = 30
+const MAX_TTL = 90
 
 type Mode = 'auto' | 'create' | 'update'
 
@@ -49,6 +50,7 @@ interface Result {
   namespace: string
   expiresAt?: string
   action: Action
+  replacedId?: string
 }
 
 function toResult(
@@ -98,7 +100,7 @@ export async function run(): Promise<void> {
 
     const kind: Kind = detectKind(path, core.getInput('kind') || 'auto')
 
-    const targetId = await resolveTargetId({
+    const target = await resolveTargetId({
       mode,
       updateId,
       ownerToken,
@@ -110,7 +112,8 @@ export async function run(): Promise<void> {
 
     const result = await publish({
       kind,
-      updateId: targetId,
+      updateId: target.id,
+      discovered: target.discovered,
       path,
       baseUrl,
       namespace,
@@ -137,7 +140,8 @@ export async function run(): Promise<void> {
       expiresAt: result.expiresAt,
       ownerToken,
       minted,
-      action: result.action
+      action: result.action,
+      replacedId: result.replacedId
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -147,6 +151,11 @@ export async function run(): Promise<void> {
       core.warning(message)
     }
   }
+}
+
+interface Target {
+  id?: string
+  discovered: boolean
 }
 
 interface ResolveTargetArgs {
@@ -163,22 +172,20 @@ interface ResolveTargetArgs {
 // Explicit update-id always wins. In auto/update mode an owner token can discover
 // its own prior resource for the same namespace+kind. mode=create never updates.
 // A freshly minted token has no prior resources, so discovery is skipped.
-async function resolveTargetId(
-  args: ResolveTargetArgs
-): Promise<string | undefined> {
+async function resolveTargetId(args: ResolveTargetArgs): Promise<Target> {
   const { mode, updateId, ownerToken, minted, baseUrl, namespace, kind } = args
 
   if (updateId !== undefined) {
-    return updateId
+    return { id: updateId, discovered: false }
   }
 
   if (mode === 'create') {
-    return undefined
+    return { discovered: false }
   }
 
   if (mode === 'auto' && minted) {
     // A token minted this run cannot own any existing resource: create directly.
-    return undefined
+    return { discovered: false }
   }
 
   // Files are immutable (no PUT for /api/files): never discover, always create.
@@ -190,7 +197,7 @@ async function resolveTargetId(
           'cannot be updated in place. Use mode=create (a new resource is published each run).'
       )
     }
-    return undefined
+    return { discovered: false }
   }
 
   if (mode === 'auto' || mode === 'update') {
@@ -207,7 +214,7 @@ async function resolveTargetId(
             'Pass update-id to target a specific resource.'
         )
       }
-      return discovery.id
+      return { id: discovery.id, discovered: true }
     }
     if (mode === 'update') {
       throw new Error(
@@ -217,12 +224,13 @@ async function resolveTargetId(
     }
   }
 
-  return undefined
+  return { discovered: false }
 }
 
 interface PublishArgs {
   kind: Kind
   updateId?: string
+  discovered: boolean
   path: string
   baseUrl: string
   namespace: string
@@ -235,9 +243,73 @@ interface PublishArgs {
 }
 
 async function publish(args: PublishArgs): Promise<Result> {
+  const { updateId, discovered, namespace } = args
+
+  let replacedId: string | undefined
+  if (updateId !== undefined) {
+    try {
+      const updated = await update(args, updateId)
+      if (updated !== undefined) {
+        return updated
+      }
+    } catch (error) {
+      if (!(error instanceof OldPublicationReadOnlyError) || !discovered) {
+        throw error
+      }
+      replacedId = updateId
+      core.warning(
+        `Resource ${namespace}/${updateId} is read-only (old publication); creating a new one instead.` +
+          (error.republishUrl === undefined
+            ? ''
+            : ` Republish URL: ${error.republishUrl}`)
+      )
+    }
+  }
+  const created = await create(args)
+  return replacedId === undefined ? created : { ...created, replacedId }
+}
+
+// PUT the resolved target; undefined for files, which are immutable (caller creates).
+async function update(
+  args: PublishArgs,
+  id: string
+): Promise<Result | undefined> {
+  const { kind, path, baseUrl, namespace, ttl, entry, ownerToken } = args
+  if (kind === 'site') {
+    return toResult(
+      await putSite(baseUrl, {
+        dirOrZip: path,
+        ns: namespace,
+        id,
+        ttl,
+        entry,
+        ownerToken
+      }),
+      'updated'
+    )
+  }
+  if (kind === 'html' || kind === 'markdown') {
+    return toResult(
+      await putHtml(baseUrl, {
+        body: await readText(path),
+        ns: namespace,
+        id,
+        ttl,
+        format: kind === 'markdown' ? 'markdown' : 'html',
+        ownerToken
+      }),
+      'updated'
+    )
+  }
+  core.warning(
+    'A file artefact cannot be updated in place (files are immutable). Creating a new resource instead.'
+  )
+  return undefined
+}
+
+async function create(args: PublishArgs): Promise<Result> {
   const {
     kind,
-    updateId,
     path,
     baseUrl,
     namespace,
@@ -248,39 +320,6 @@ async function publish(args: PublishArgs): Promise<Result> {
     ownerToken,
     showTopBar
   } = args
-
-  if (updateId !== undefined) {
-    if (kind === 'site') {
-      return toResult(
-        await putSite(baseUrl, {
-          dirOrZip: path,
-          ns: namespace,
-          id: updateId,
-          ttl,
-          entry,
-          ownerToken
-        }),
-        'updated'
-      )
-    }
-    if (kind === 'html' || kind === 'markdown') {
-      return toResult(
-        await putHtml(baseUrl, {
-          body: await readText(path),
-          ns: namespace,
-          id: updateId,
-          ttl,
-          format: kind === 'markdown' ? 'markdown' : 'html',
-          ownerToken
-        }),
-        'updated'
-      )
-    }
-    // Files are immutable: there is no PUT for /api/files, so create a new resource.
-    core.warning(
-      'A file artefact cannot be updated in place (files are immutable). Creating a new resource instead.'
-    )
-  }
 
   if (kind === 'site') {
     return toResult(

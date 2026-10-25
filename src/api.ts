@@ -158,12 +158,53 @@ function buildUrl(
   return url.toString()
 }
 
+// 409 OLD_PUBLICATION_READ_ONLY: the publication cannot be updated; republish at republishUrl.
+export class OldPublicationReadOnlyError extends Error {
+  readonly republishUrl?: string
+
+  constructor(operation: string, republishUrl?: string) {
+    super(
+      `${operation} failed: the publication is read-only (OLD_PUBLICATION_READ_ONLY).` +
+        (republishUrl === undefined ? '' : ` Republish at ${republishUrl}`)
+    )
+    this.name = 'OldPublicationReadOnlyError'
+    this.republishUrl = republishUrl
+  }
+}
+
+function readOnlyError(
+  status: number,
+  text: string,
+  operation: string
+): OldPublicationReadOnlyError | undefined {
+  if (status !== 409) {
+    return undefined
+  }
+  try {
+    const body = JSON.parse(text) as { code?: unknown; republishUrl?: unknown }
+    if (body.code !== 'OLD_PUBLICATION_READ_ONLY') {
+      return undefined
+    }
+    const url =
+      typeof body.republishUrl === 'string' ? body.republishUrl : undefined
+    return new OldPublicationReadOnlyError(operation, url)
+  } catch {
+    return undefined
+  }
+}
+
 async function ensureOk(response: Response, operation: string): Promise<void> {
   if (response.ok) {
     return
   }
   const text = await response.text().catch(() => '')
-  throw new Error(`${operation} failed: HTTP ${response.status} ${response.statusText} ${text}`.trim())
+  const readOnly = readOnlyError(response.status, text, operation)
+  if (readOnly !== undefined) {
+    throw readOnly
+  }
+  throw new Error(
+    `${operation} failed: HTTP ${response.status} ${response.statusText} ${text}`.trim()
+  )
 }
 
 // GET /api/owner-token: mints a fresh, unauthenticated owner token (rate limited per IP).
@@ -218,7 +259,11 @@ export async function postHtml(
     requestBody = options.body
   }
 
-  const response = await fetch(url, { method: 'POST', headers, body: requestBody })
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: requestBody
+  })
   await ensureOk(response, 'postHtml')
   return (await response.json()) as CreateResponse
 }
@@ -278,7 +323,11 @@ export async function postFile(
     tags: options.tags
   })
   const form = new FormData()
-  form.append('file', await fileToBlob(options.filePath), basename(options.filePath))
+  form.append(
+    'file',
+    await fileToBlob(options.filePath),
+    basename(options.filePath)
+  )
 
   const headers: Record<string, string> = {}
   if (options.ownerToken) {

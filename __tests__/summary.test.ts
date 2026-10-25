@@ -142,4 +142,30 @@ describe('buildSummary', () => {
       expect(text).toMatch(/BREWPAGE_OWNER_TOKEN/)
     })
   })
+
+  describe('profile hint', () => {
+    // GIVEN any completed publish
+    // WHEN buildSummary is called
+    // THEN the optional sign-in TIP is written before "Powered by"
+
+    it('writes the optional sign-in TIP before the Powered by line', async () => {
+      mockSummary.addRaw.mockClear()
+      await buildSummary(mockCore, {
+        link: 'https://brewpage.app/public/abc123',
+        ownerLink: 'https://brewpage.app/public/abc123?owner=1',
+        id: 'abc123',
+        namespace: 'public',
+        ownerToken: 'secret-token',
+        minted: false,
+        action: 'created'
+      })
+
+      const texts = mockSummary.addRaw.mock.calls.map(([text]) => text)
+      expect(texts).toEqual([
+        'Created resource on BrewPage',
+        '> [!TIP]\n> Optional: sign in at https://account.brewpage.app to manage your pages and tokens from any device. Not required.',
+        'Powered by '
+      ])
+    })
+  })
 })

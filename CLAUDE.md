@@ -23,7 +23,7 @@ For any endpoint/param/header/response-field question: read SPEC. !=guess REST s
 
 Endpoints the ACT actually calls (SPEC):
 - `GET /api/owner-token` — mint an OT when caller supplies none.
-- `POST /api/html` (create) / `PUT /api/html/{ns}/{id}` (update) — HTML/markdown. Params: `?ns=`, `?ttl=` (1..30d), `?format=html|markdown`, `?tags=`; headers `X-Password`, `X-Owner-Token`. Returns `HtmlUploadResponse`.
+- `POST /api/html` (create) / `PUT /api/html/{ns}/{id}` (update) — HTML/markdown. Params: `?ns=`, `?ttl=` (1..90d), `?format=html|markdown`, `?tags=`; headers `X-Password`, `X-Owner-Token`. Returns `HtmlUploadResponse`.
 - `POST /api/files` — binary file upload (immutable; no PUT update).
 - `POST /api/sites` (create) / `PUT /api/sites/{ns}/{id}` (update) — multi-file static sites (`kind: site`, e.g. Playwright report dir).
 
@@ -43,9 +43,9 @@ Flow: `inputs → mint-or-reuse OT (setSecret) → detect kind + resolve NS → 
 | `kind` | no | `auto` | `html` \| `markdown` \| `site` \| `file` \| `auto` |
 | `namespace` | no | _(empty)_ | Empty derives per-repo slug from `github.repository`. Unprotected `public` resources are gallery-eligible; custom NS unlisted. NEW sites/native hosts: `noindex`. |
 | `password` | no | _(empty)_ | Access password; protected resource hidden from gallery. Independent of NS/delivery mode; NEW browser links use clean trusted unlock. |
-| `ttl-days` | no | `15` | TTL in days (1..30). |
+| `ttl-days` | no | `15` | TTL in days (1..90; server clamps by account). |
 | `tags` | no | _(empty)_ | Comma-separated tags. |
-| `owner-token` | no | _(empty)_ | OT for the resource. Empty auto-mints one (surfaced in job summary; persist as secret for redeploys). |
+| `owner-token` | no | _(empty)_ | X-Owner-Token: one from an earlier run or from your profile. Empty auto-mints a token surfaced in the job summary; persist it as a secret. |
 | `mode` | no | `auto` | Publish operation, independent of delivery mode: `auto` \| `create` \| `update`. `auto` = discover-by-owner then PUT-else-POST; `create` always POST; `update` requires resolvable existing resource else fails. |
 | `update-id` | no | _(empty)_ | Id of existing resource. With `owner-token` → explicit PUT. Takes precedence over `mode` auto-discovery. |
 | `entry` | no | _(empty)_ | Site entry file override (default `index.html`). |
