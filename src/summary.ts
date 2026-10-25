@@ -9,6 +9,7 @@ export interface SummaryData {
   ownerToken: string
   minted: boolean
   action: 'created' | 'updated'
+  replacedId?: string
 }
 
 // Render the job summary to $GITHUB_STEP_SUMMARY: the live URL, resource metadata,
@@ -52,6 +53,21 @@ export async function buildSummary(
       true
     )
   }
+
+  if (data.replacedId !== undefined) {
+    summary.addRaw(
+      `Read-only old publication \`${data.namespace}/${data.replacedId}\` was replaced by the new URL above.`,
+      true
+    )
+  }
+
+  summary.addRaw(
+    [
+      '> [!TIP]',
+      '> Optional: sign in free (Google or any email) at https://account.brewpage.app to never lose your pages or tokens and to mint tokens that never expire. Not needed to publish.'
+    ].join('\n'),
+    true
+  )
 
   summary.addRaw('Powered by ', false)
   summary.addLink('https://brewpage.app', 'https://brewpage.app')

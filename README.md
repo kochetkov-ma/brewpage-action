@@ -16,9 +16,9 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 | `kind` | no | `auto` | Artefact kind: `html`, `markdown`, `site`, `file`, or `auto`. |
 | `namespace` | no | _(empty)_ | Target namespace. Empty derives a deterministic per-repo slug from `github.repository`. Unprotected `public` resources are eligible for the gallery; custom namespaces are unlisted. Eligible public HTML, sites and files may permit indexing on native hosts. Namespace, password and delivery mode are independent. |
 | `password` | no | _(empty)_ | Optional access password; protected resources are hidden from the gallery. NEW browser links stay clean and unlock through `unlock.brewpage.app`; password protection does not select delivery mode. |
-| `ttl-days` | no | `15` | Requested creation TTL in days (1..30), subject to owner limits. PUT retains the original expiry; use the returned `expires-at`. |
+| `ttl-days` | no | `15` | Requested creation TTL in days (1..90), subject to account limits. PUT retains the original expiry; use the returned `expires-at`. |
 | `tags` | no | _(empty)_ | Comma-separated tags used for search and grouping on [brewpage.app](https://brewpage.app). |
-| `owner-token` | no | _(empty)_ | `X-Owner-Token` for the resource. Empty auto-mints a token surfaced in the job summary -- persist it as a secret for redeploys. |
+| `owner-token` | no | _(empty)_ | `X-Owner-Token`: one from an earlier run or from your profile. Empty auto-mints a token surfaced in the job summary; persist it as a secret. |
 | `mode` | no | `auto` | Publish operation: `auto`, `create`, or `update`; independent of delivery mode. `auto` auto-republishes -- with a persisted `owner-token` it discovers the matching resource for this namespace+kind via the [brewpage.app](https://brewpage.app) owner gallery and updates it (PUT), or creates one on first run. `create` always creates a new resource; `update` requires an existing resource (`update-id` or a discoverable one) and fails otherwise. |
 | `update-id` | no | _(empty)_ | Id of an existing resource on [brewpage.app](https://brewpage.app). With `owner-token`, explicitly updates that resource (PUT) instead of relying on auto-discovery. Takes precedence over `mode` auto-discovery. |
 | `entry` | no | _(empty)_ | Site entry file override (default `index.html`). |
@@ -71,6 +71,8 @@ Use this for a quick one-off preview. You pass only `path` (and optionally `kind
 
 This is the one-time prerequisite for scenarios 3 and 4. It is not an action call of its own -- just get a token and store it as the repo secret `BREWPAGE_OWNER_TOKEN`. The `owner-token` is the only credential that can update or delete the resource on [brewpage.app](https://brewpage.app); lose it and the resource is unmanageable.
 
+Optional: sign in free (Google or any email) at <https://account.brewpage.app> to never lose your pages or tokens and to mint tokens that never expire. Not needed to publish.
+
 **Option A -- mint a token directly and paste it into a secret:**
 
 ```bash
@@ -112,7 +114,7 @@ Use this when you already created the resource (manually or in an earlier run) a
 
 **Requests made:** exactly one -- `PUT /api/{html|sites}/{ns}/{id}` with header `X-Owner-Token`. No mint, no gallery discovery (`update-id` short-circuits everything).
 
-**What happens:** the content is replaced in place at the same URL on [brewpage.app](https://brewpage.app). The `owner-token` must own the resource (otherwise `403`), and `ns`+`id` must already exist (otherwise `404` -- `PUT` does not create). Files are immutable: `kind: file` has no `PUT`, so a new resource is created instead.
+**What happens:** the content is replaced in place at the same URL on [brewpage.app](https://brewpage.app). The `owner-token` must own the resource (otherwise `403`), and `ns`+`id` must already exist (otherwise `404` -- `PUT` does not create). Files are immutable: `kind: file` has no `PUT`, so a new resource is created instead. A read-only old publication answers `409` (`OLD_PUBLICATION_READ_ONLY`): the step fails with its `republishUrl`; with `mode: auto` discovery it warns and creates a new resource instead.
 
 ### 4. Full-auto redeploy (most automatic, one extra request)
 

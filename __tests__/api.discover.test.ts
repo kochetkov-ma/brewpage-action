@@ -3,11 +3,7 @@ import type { DiscoverResult } from '../src/api.js'
 
 // --- helpers -----------------------------------------------------------------
 
-function makeResponse(
-  ok: boolean,
-  status: number,
-  body: object
-): Response {
+function makeResponse(ok: boolean, status: number, body: object): Response {
   return {
     ok,
     status,
@@ -21,7 +17,9 @@ function galleryPage(items: object[], total: number, page = 0): object {
   return { items, total, page, size: 100 }
 }
 
-function makeFetch(...responses: Response[]): jest.MockedFunction<typeof fetch> {
+function makeFetch(
+  ...responses: Response[]
+): jest.MockedFunction<typeof fetch> {
   const mock = jest.fn() as jest.MockedFunction<typeof fetch>
   for (const r of responses) {
     mock.mockResolvedValueOnce(r)
@@ -60,14 +58,21 @@ describe('discoverOwnResource - found', () => {
     const page = galleryPage([item], 1)
     global.fetch = makeFetch(makeResponse(true, 200, page))
 
-    await discoverOwnResource('https://brewpage.app', 'owner-tok', 'public', 'html')
+    await discoverOwnResource(
+      'https://brewpage.app',
+      'owner-tok',
+      'public',
+      'html'
+    )
 
     const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toContain('/api/gallery')
     expect(url).toContain('mine=true')
-    expect((init.headers as Record<string, string>)['X-Owner-Token']).toEqual('owner-tok')
+    expect((init.headers as Record<string, string>)['X-Owner-Token']).toEqual(
+      'owner-tok'
+    )
   })
 })
 
@@ -120,9 +125,24 @@ describe('discoverOwnResource - multiple matches pick oldest', () => {
 
   it('returns the oldest createdAt id with ambiguous flag when several match', async () => {
     const items = [
-      { id: 'newest', namespace: 'public', type: 'html', createdAt: '2026-03-01T00:00:00Z' },
-      { id: 'oldest', namespace: 'public', type: 'html', createdAt: '2026-01-01T00:00:00Z' },
-      { id: 'middle', namespace: 'public', type: 'html', createdAt: '2026-02-01T00:00:00Z' }
+      {
+        id: 'newest',
+        namespace: 'public',
+        type: 'html',
+        createdAt: '2026-03-01T00:00:00Z'
+      },
+      {
+        id: 'oldest',
+        namespace: 'public',
+        type: 'html',
+        createdAt: '2026-01-01T00:00:00Z'
+      },
+      {
+        id: 'middle',
+        namespace: 'public',
+        type: 'html',
+        createdAt: '2026-02-01T00:00:00Z'
+      }
     ]
     global.fetch = makeFetch(makeResponse(true, 200, galleryPage(items, 3)))
 
@@ -143,7 +163,12 @@ describe('discoverOwnResource - multiple matches pick oldest', () => {
   it('treats missing createdAt as last so a dated item is chosen', async () => {
     const items = [
       { id: 'no-ts', namespace: 'public', type: 'html' },
-      { id: 'dated', namespace: 'public', type: 'html', createdAt: '2026-01-01T00:00:00Z' }
+      {
+        id: 'dated',
+        namespace: 'public',
+        type: 'html',
+        createdAt: '2026-01-01T00:00:00Z'
+      }
     ]
     global.fetch = makeFetch(makeResponse(true, 200, galleryPage(items, 2)))
 
@@ -303,7 +328,9 @@ describe('discoverOwnResource - pagination', () => {
 
   it('stops on a short first page even when total claims more', async () => {
     const items = [{ id: 'only', namespace: 'public', type: 'html' }]
-    global.fetch = makeFetch(makeResponse(true, 200, galleryPage(items, 9999, 0)))
+    global.fetch = makeFetch(
+      makeResponse(true, 200, galleryPage(items, 9999, 0))
+    )
 
     await discoverOwnResource('https://brewpage.app', 'tok', 'public', 'html')
 

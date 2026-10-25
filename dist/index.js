@@ -30543,11 +30543,41 @@ function buildUrl(baseUrl, path, query) {
     }
     return url.toString();
 }
+// 409 OLD_PUBLICATION_READ_ONLY: the publication cannot be updated; republish at republishUrl.
+class OldPublicationReadOnlyError extends Error {
+    republishUrl;
+    constructor(operation, republishUrl) {
+        super(`${operation} failed: the publication is read-only (OLD_PUBLICATION_READ_ONLY).` +
+            (republishUrl === undefined ? '' : ` Republish at ${republishUrl}`));
+        this.name = 'OldPublicationReadOnlyError';
+        this.republishUrl = republishUrl;
+    }
+}
+function readOnlyError(status, text, operation) {
+    if (status !== 409) {
+        return undefined;
+    }
+    try {
+        const body = JSON.parse(text);
+        if (body.code !== 'OLD_PUBLICATION_READ_ONLY') {
+            return undefined;
+        }
+        const url = typeof body.republishUrl === 'string' ? body.republishUrl : undefined;
+        return new OldPublicationReadOnlyError(operation, url);
+    }
+    catch {
+        return undefined;
+    }
+}
 async function ensureOk(response, operation) {
     if (response.ok) {
         return;
     }
     const text = await response.text().catch(() => '');
+    const readOnly = readOnlyError(response.status, text, operation);
+    if (readOnly !== undefined) {
+        throw readOnly;
+    }
     throw new Error(`${operation} failed: HTTP ${response.status} ${response.statusText} ${text}`.trim());
 }
 // GET /api/owner-token: mints a fresh, unauthenticated owner token (rate limited per IP).
@@ -30588,7 +30618,11 @@ async function postHtml(baseUrl, options) {
             options.format === 'markdown' ? 'text/markdown' : 'text/html';
         requestBody = options.body;
     }
-    const response = await fetch(url, { method: 'POST', headers, body: requestBody });
+    const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: requestBody
+    });
     await ensureOk(response, 'postHtml');
     return (await response.json());
 }
@@ -30781,6 +30815,13 @@ async function buildSummary(coreModule, data) {
             '> redeploys. The token value itself is masked in logs and is not printed here.'
         ].join('\n'), true);
     }
+    if (data.replacedId !== undefined) {
+        summary.addRaw(`Read-only old publication \`${data.namespace}/${data.replacedId}\` was replaced by the new URL above.`, true);
+    }
+    summary.addRaw([
+        '> [!TIP]',
+        '> Optional: sign in free (Google or any email) at https://account.brewpage.app to never lose your pages or tokens and to mint tokens that never expire. Not needed to publish.'
+    ].join('\n'), true);
     summary.addRaw('Powered by ', false);
     summary.addLink('https://brewpage.app', 'https://brewpage.app');
     await summary.write();
@@ -30788,7 +30829,7 @@ async function buildSummary(coreModule, data) {
 
 const DEFAULT_BASE_URL = 'https://brewpage.app';
 const MIN_TTL = 1;
-const MAX_TTL = 30;
+const MAX_TTL = 90;
 function parseMode(raw) {
     if (raw === 'create' || raw === 'update') {
         return raw;
@@ -30841,7 +30882,7 @@ async function run() {
         }
         setSecret(ownerToken);
         const kind = detectKind(path, getInput('kind') || 'auto');
-        const targetId = await resolveTargetId({
+        const target = await resolveTargetId({
             mode,
             updateId,
             ownerToken,
@@ -30852,7 +30893,8 @@ async function run() {
         });
         const result = await publish({
             kind,
-            updateId: targetId,
+            updateId: target.id,
+            discovered: target.discovered,
             path,
             baseUrl,
             namespace,
@@ -30877,7 +30919,8 @@ async function run() {
             expiresAt: result.expiresAt,
             ownerToken,
             minted,
-            action: result.action
+            action: result.action,
+            replacedId: result.replacedId
         });
     }
     catch (error) {
@@ -30897,14 +30940,14 @@ async function run() {
 async function resolveTargetId(args) {
     const { mode, updateId, ownerToken, minted, baseUrl, namespace, kind } = args;
     if (updateId !== undefined) {
-        return updateId;
+        return { id: updateId, discovered: false };
     }
     if (mode === 'create') {
-        return undefined;
+        return { discovered: false };
     }
     if (mode === 'auto' && minted) {
         // A token minted this run cannot own any existing resource: create directly.
-        return undefined;
+        return { discovered: false };
     }
     // Files are immutable (no PUT for /api/files): never discover, always create.
     // mode=update must fail loudly rather than silently creating a second file.
@@ -30913,7 +30956,7 @@ async function resolveTargetId(args) {
             throw new Error('mode=update is not supported for file artefacts: files are immutable and ' +
                 'cannot be updated in place. Use mode=create (a new resource is published each run).');
         }
-        return undefined;
+        return { discovered: false };
     }
     if (mode === 'auto' || mode === 'update') {
         const discovery = await discoverOwnResource(baseUrl, ownerToken, namespace, kind);
@@ -30922,41 +30965,67 @@ async function resolveTargetId(args) {
                 warning(`Multiple ${kind} resources found in namespace "${namespace}"; updating the oldest one. ` +
                     'Pass update-id to target a specific resource.');
             }
-            return discovery.id;
+            return { id: discovery.id, discovered: true };
         }
         if (mode === 'update') {
             throw new Error(`mode=update requires an existing resource, but none could be resolved for ` +
                 `namespace "${namespace}" and kind "${kind}" (set update-id or use mode=auto).`);
         }
     }
-    return undefined;
+    return { discovered: false };
 }
 async function publish(args) {
-    const { kind, updateId, path, baseUrl, namespace, ttl, tags, entry, password, ownerToken, showTopBar } = args;
+    const { updateId, discovered, namespace } = args;
+    let replacedId;
     if (updateId !== undefined) {
-        if (kind === 'site') {
-            return toResult(await putSite(baseUrl, {
-                dirOrZip: path,
-                ns: namespace,
-                id: updateId,
-                ttl,
-                entry,
-                ownerToken
-            }), 'updated');
+        try {
+            const updated = await update(args, updateId);
+            if (updated !== undefined) {
+                return updated;
+            }
         }
-        if (kind === 'html' || kind === 'markdown') {
-            return toResult(await putHtml(baseUrl, {
-                body: await readText(path),
-                ns: namespace,
-                id: updateId,
-                ttl,
-                format: kind === 'markdown' ? 'markdown' : 'html',
-                ownerToken
-            }), 'updated');
+        catch (error) {
+            if (!(error instanceof OldPublicationReadOnlyError) || !discovered) {
+                throw error;
+            }
+            replacedId = updateId;
+            warning(`Resource ${namespace}/${updateId} is read-only (old publication); creating a new one instead.` +
+                (error.republishUrl === undefined
+                    ? ''
+                    : ` Republish URL: ${error.republishUrl}`));
         }
-        // Files are immutable: there is no PUT for /api/files, so create a new resource.
-        warning('A file artefact cannot be updated in place (files are immutable). Creating a new resource instead.');
     }
+    const created = await create(args);
+    return replacedId === undefined ? created : { ...created, replacedId };
+}
+// PUT the resolved target; undefined for files, which are immutable (caller creates).
+async function update(args, id) {
+    const { kind, path, baseUrl, namespace, ttl, entry, ownerToken } = args;
+    if (kind === 'site') {
+        return toResult(await putSite(baseUrl, {
+            dirOrZip: path,
+            ns: namespace,
+            id,
+            ttl,
+            entry,
+            ownerToken
+        }), 'updated');
+    }
+    if (kind === 'html' || kind === 'markdown') {
+        return toResult(await putHtml(baseUrl, {
+            body: await readText(path),
+            ns: namespace,
+            id,
+            ttl,
+            format: kind === 'markdown' ? 'markdown' : 'html',
+            ownerToken
+        }), 'updated');
+    }
+    warning('A file artefact cannot be updated in place (files are immutable). Creating a new resource instead.');
+    return undefined;
+}
+async function create(args) {
+    const { kind, path, baseUrl, namespace, ttl, tags, entry, password, ownerToken, showTopBar } = args;
     if (kind === 'site') {
         return toResult(await postSite(baseUrl, {
             dirOrZip: path,
