@@ -117,6 +117,8 @@ When inputs/outputs change, update ALL THREE in same change:
 
 **Version pinning — no exceptions.** Every `package.json` dep pinned exact (`X.Y.Z`, no `^`/`~`); every WF `uses:` pinned exact `vX.Y.Z`. Forbidden: `@latest`, floating major shorthand `@v4`, `@main`. Current WF pins: `actions/checkout@v6.0.3`, `actions/setup-node@v6.4.0`, `softprops/action-gh-release@v3.0.0`, `actions/upload-artifact@v7.0.1`. (Consumers may still ref ACT as `@v1` — published major-tag contract, separate from how THIS REPO pins its own deps.)
 
+**User-Agent.** Every request to brewpage.app sends User-Agent `<client>/<version>` (`USER_AGENT` in `src/api.ts`, version from `package.json`).
+
 **Commit `dist/`.** The node24 ACT runs the committed bundle, not source. Every change to `src/` → `npm run build` → commit `dist/`. `check-dist.yml` CI rebuilds and fails on `git diff --exit-code dist/` drift, so a stale bundle never ships.
 
 License: MIT (`LICENSE`).

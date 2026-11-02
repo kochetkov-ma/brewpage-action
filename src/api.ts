@@ -1,5 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { basename, join, posix, relative, sep } from 'node:path'
+import pkg from '../package.json' with { type: 'json' }
 
 export interface CreateResponse {
   id: string
@@ -57,7 +58,8 @@ export type DiscoverResult =
   | { status: 'none' }
   | { status: 'unavailable' }
 
-const USER_AGENT = 'brewpage-action'
+// Sent on every request so brewpage.app attributes traffic to this client and version.
+export const USER_AGENT = `${pkg.name}/${pkg.version} (+https://brewpage.app)`
 const GALLERY_PAGE_SIZE = 100
 // Safety bound so a misbehaving backend (e.g. never-shrinking pages) cannot loop forever.
 const GALLERY_MAX_PAGES = 50
@@ -216,7 +218,8 @@ async function ensureOk(response: Response, operation: string): Promise<void> {
 // GET /api/owner-token: mints a fresh, unauthenticated owner token (rate limited per IP).
 export async function mintToken(baseUrl: string): Promise<OwnerToken> {
   const response = await fetch(buildUrl(baseUrl, '/api/owner-token', {}), {
-    method: 'GET'
+    method: 'GET',
+    headers: { 'User-Agent': USER_AGENT }
   })
   await ensureOk(response, 'mintToken')
   const body = (await response.json()) as OwnerToken
@@ -244,7 +247,7 @@ export async function postHtml(
     tags: options.tags,
     format: options.format
   })
-  const headers: Record<string, string> = {}
+  const headers: Record<string, string> = { 'User-Agent': USER_AGENT }
   if (options.ownerToken) {
     headers['X-Owner-Token'] = options.ownerToken
   }
@@ -298,7 +301,8 @@ export async function putHtml(
     headers: {
       'Content-Type':
         options.format === 'markdown' ? 'text/markdown' : 'text/html',
-      'X-Owner-Token': options.ownerToken
+      'X-Owner-Token': options.ownerToken,
+      'User-Agent': USER_AGENT
     },
     body: options.body
   })
@@ -335,7 +339,7 @@ export async function postFile(
     basename(options.filePath)
   )
 
-  const headers: Record<string, string> = {}
+  const headers: Record<string, string> = { 'User-Agent': USER_AGENT }
   if (options.ownerToken) {
     headers['X-Owner-Token'] = options.ownerToken
   }
@@ -403,7 +407,7 @@ export async function postSite(
   })
   const form = await buildSiteForm(options.dirOrZip)
 
-  const headers: Record<string, string> = {}
+  const headers: Record<string, string> = { 'User-Agent': USER_AGENT }
   if (options.ownerToken) {
     headers['X-Owner-Token'] = options.ownerToken
   }
@@ -435,7 +439,10 @@ export async function putSite(
   const form = await buildSiteForm(options.dirOrZip)
   const response = await fetch(url, {
     method: 'PUT',
-    headers: { 'X-Owner-Token': options.ownerToken },
+    headers: {
+      'X-Owner-Token': options.ownerToken,
+      'User-Agent': USER_AGENT
+    },
     body: form
   })
   await ensureOk(response, 'putSite')
