@@ -2,7 +2,7 @@ import { jest } from '@jest/globals'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { postSite, putSite } from '../src/api.js'
+import { USER_AGENT, postSite, putSite } from '../src/api.js'
 
 describe('site upload transport', () => {
   let directory: string
@@ -58,6 +58,7 @@ describe('site upload transport', () => {
       'https://brewpage.app/api/sites?ns=public&ttl=15&entry=index.html'
     )
     expect(init?.headers).toEqual({
+      'User-Agent': USER_AGENT,
       'X-Owner-Token': 'owner',
       'X-Password': 'password'
     })

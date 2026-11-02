@@ -30455,7 +30455,14 @@ var core = /*#__PURE__*/Object.freeze({
     warning: warning
 });
 
-const USER_AGENT = 'brewpage-action';
+var name = "brewpage-action";
+var version = "1.2.4";
+var pkg = {
+	name: name,
+	version: version};
+
+// Sent on every request so brewpage.app attributes traffic to this client and version.
+const USER_AGENT = `${pkg.name}/${pkg.version} (+https://brewpage.app)`;
 const GALLERY_PAGE_SIZE = 100;
 // Safety bound so a misbehaving backend (e.g. never-shrinking pages) cannot loop forever.
 const GALLERY_MAX_PAGES = 50;
@@ -30585,7 +30592,8 @@ async function ensureOk(response, operation) {
 // GET /api/owner-token: mints a fresh, unauthenticated owner token (rate limited per IP).
 async function mintToken(baseUrl) {
     const response = await fetch(buildUrl(baseUrl, '/api/owner-token', {}), {
-        method: 'GET'
+        method: 'GET',
+        headers: { 'User-Agent': USER_AGENT }
     });
     await ensureOk(response, 'mintToken');
     const body = (await response.json());
@@ -30600,7 +30608,7 @@ async function postHtml(baseUrl, options) {
         tags: options.tags,
         format: options.format
     });
-    const headers = {};
+    const headers = { 'User-Agent': USER_AGENT };
     if (options.ownerToken) {
         headers['X-Owner-Token'] = options.ownerToken;
     }
@@ -30641,7 +30649,8 @@ async function putHtml(baseUrl, options) {
         method: 'PUT',
         headers: {
             'Content-Type': options.format === 'markdown' ? 'text/markdown' : 'text/html',
-            'X-Owner-Token': options.ownerToken
+            'X-Owner-Token': options.ownerToken,
+            'User-Agent': USER_AGENT
         },
         body: options.body
     });
@@ -30661,7 +30670,7 @@ async function postFile(baseUrl, options) {
     });
     const form = new FormData();
     form.append('file', await fileToBlob(options.filePath), basename(options.filePath));
-    const headers = {};
+    const headers = { 'User-Agent': USER_AGENT };
     if (options.ownerToken) {
         headers['X-Owner-Token'] = options.ownerToken;
     }
@@ -30713,7 +30722,7 @@ async function postSite(baseUrl, options) {
         entry: options.entry
     });
     const form = await buildSiteForm(options.dirOrZip);
-    const headers = {};
+    const headers = { 'User-Agent': USER_AGENT };
     if (options.ownerToken) {
         headers['X-Owner-Token'] = options.ownerToken;
     }
@@ -30733,7 +30742,10 @@ async function putSite(baseUrl, options) {
     const form = await buildSiteForm(options.dirOrZip);
     const response = await fetch(url, {
         method: 'PUT',
-        headers: { 'X-Owner-Token': options.ownerToken },
+        headers: {
+            'X-Owner-Token': options.ownerToken,
+            'User-Agent': USER_AGENT
+        },
         body: form
     });
     await ensureOk(response, 'putSite');
