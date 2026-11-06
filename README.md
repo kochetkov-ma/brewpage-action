@@ -1,6 +1,12 @@
 # brewpage-action
 
-[![CI](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/ci.yml/badge.svg)](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/ci.yml) [![check-dist](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/check-dist.yml/badge.svg)](https://github.com/kochetkov-ma/brewpage-action/actions/workflows/check-dist.yml) [![Release](https://img.shields.io/github/v/release/kochetkov-ma/brewpage-action?sort=semver)](https://github.com/kochetkov-ma/brewpage-action/releases) [![Marketplace](https://img.shields.io/badge/Marketplace-Publish%20to%20BrewPage-purple)](https://github.com/marketplace/actions/publish-to-brewpage) [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+<p>
+<a href="https://github.com/kochetkov-ma/brewpage-action/actions/workflows/ci.yml"><img height="18" alt="CI" src="https://github.com/kochetkov-ma/brewpage-action/actions/workflows/ci.yml/badge.svg"></a>
+<a href="https://github.com/kochetkov-ma/brewpage-action/actions/workflows/check-dist.yml"><img height="18" alt="check-dist" src="https://github.com/kochetkov-ma/brewpage-action/actions/workflows/check-dist.yml/badge.svg"></a>
+<a href="https://github.com/kochetkov-ma/brewpage-action/releases"><img height="18" alt="Release" src="https://img.shields.io/github/v/release/kochetkov-ma/brewpage-action?sort=semver"></a>
+<a href="https://github.com/marketplace/actions/publish-to-brewpage"><img height="18" alt="GitHub Marketplace: Publish to BrewPage" src="https://img.shields.io/badge/Marketplace-Publish%20to%20BrewPage-purple?logo=github"></a>
+<a href="https://github.com/kochetkov-ma/brewpage-action/blob/main/LICENSE"><img height="18" alt="License MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
+</p>
 
 Publish CI artefacts -- HTML reports, markdown, multi-file sites (Playwright reports, generated docs, static builds), and single files -- to [BrewPage](https://brewpage.app) from a GitHub workflow. One step, one live URL on [brewpage.app](https://brewpage.app) as a job output.
 
@@ -181,12 +187,20 @@ Use this when you just want "publish and keep one stable URL" without tracking t
 
 > Reference the action by major tag (`@v1`) or an exact `@vX.Y.Z` -- never `@main`. Pin every other `uses:` to an exact version too.
 
-## Ecosystem
+## Related
 
-- BrewPage -- the platform this action publishes to: <https://brewpage.app>
-- REST API contract / source of truth: <https://github.com/kochetkov-ma/brewpage-openapi>
-- BrewPage Cookbook -- guides, recipes and demos built on BrewPage: <https://github.com/kochetkov-ma/brewpage-cookbook>
-- brewcode.app -- the home site of the Brew family of developer tools: <https://brewcode.app>
+- [brewpage.app](https://brewpage.app): the hosting service; [API guide](https://brewpage.app/api); [OpenAPI docs](https://kochetkov-ma.github.io/brewpage-openapi/)
+- [brewpage-openapi](https://github.com/kochetkov-ma/brewpage-openapi): OpenAPI contract and the `brewpage-mcp` MCP server ([npm](https://www.npmjs.com/package/brewpage-mcp))
+- [brewpage-cookbook](https://github.com/kochetkov-ma/brewpage-cookbook): interactive recipes published on BrewPage
+- [brewpage-obsidian](https://github.com/kochetkov-ma/brewpage-obsidian): Obsidian plugin that publishes notes ([Obsidian community](https://community.obsidian.md/plugins/brewpage-publisher))
+- [brewpage-browser-extension](https://github.com/kochetkov-ma/brewpage-browser-extension): browser extension that publishes pages, selections and files
+- [brewpage-codex-plugin](https://github.com/kochetkov-ma/brewpage-codex-plugin): Codex plugin with the publishing skill and remote MCP
+- [brewpage-publish-plugins](https://github.com/kochetkov-ma/brewpage-publish-plugins): publishing plugins for AI coding tools and the n8n node ([npm](https://www.npmjs.com/package/n8n-nodes-brewpage))
+- [langchain-brewpage](https://github.com/kochetkov-ma/langchain-brewpage): LangChain tools ([PyPI](https://pypi.org/project/langchain-brewpage/))
+- [llama-index-tools-brewpage](https://github.com/kochetkov-ma/llama-index-tools-brewpage): LlamaIndex tool spec ([PyPI](https://pypi.org/project/llama-index-tools-brewpage/))
+- [brewcode.app](https://brewcode.app): home site of the Brew family of developer tools
+
+Support: [info@brewpage.app](mailto:info@brewpage.app)
 
 ## Releases (maintainer note)
 
