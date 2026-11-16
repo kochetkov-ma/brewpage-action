@@ -90,6 +90,7 @@ Follow-up (different repo): record this decision in `brewpage-openapi/ECOSYSTEM-
 TAG-BASED (no release-please, no release PR). Flow:
 - Bump VER in `package.json`. Create annotated tag: `git tag -a vX.Y.Z -m "..."` → `git push origin main && git push origin vX.Y.Z`. Unprefixed semver `vX.Y.Z` (e.g. `v1.0.0`). One pkg per REPO → no tag prefix → keeps `@v1` major ref clean for Actions MKT.
 - Tag push fires `release.yml` → checkout, `npm ci`, lint, test, build, verify committed `dist/` == fresh rebuild (FAILS on drift), creates GitHub Release (`softprops/action-gh-release`), force-moves major tag `v1` to released commit so `@v1` consumers auto-update.
+- Mirrors (`mirrors.yml`: GitFlic, SourceCraft, GitVerse) run on main/tag push AND after `Release` completes (`workflow_run`): the `v1` move uses `GITHUB_TOKEN`, which triggers no push run, so without it mirrors keep the old `v1`. Verify with `git ls-remote <mirror> refs/tags/v1`.
 - ACT listed on MKT since `v1.1.2`. MKT publication of a REL = manual owner step in the Release UI, NOT done by `release.yml` → after each REL check the listing shows the new tag.
 - RELs: see <https://github.com/kochetkov-ma/brewpage-action/releases>. `@v1` = stable consumer ref.
 - MKT metadata REQ in `action.yml`: `name`, `description`, `branding` (cur: `icon: upload-cloud`, `color: purple`). All three mandatory — !=remove.
