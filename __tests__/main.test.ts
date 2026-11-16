@@ -41,6 +41,14 @@ jest.unstable_mockModule('node:fs/promises', () => ({
 
 const { run } = await import('../src/main.js')
 
+// Summary is written only when the runner provides a summary file (GitHub does).
+beforeEach(() => {
+  process.env.GITHUB_STEP_SUMMARY = 'step-summary.md'
+})
+afterEach(() => {
+  delete process.env.GITHUB_STEP_SUMMARY
+})
+
 // --- helpers -----------------------------------------------------------------
 
 const CREATE_RESPONSE = {

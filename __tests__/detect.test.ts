@@ -5,7 +5,8 @@ jest.unstable_mockModule('node:fs', () => ({
 }))
 
 const { statSync } = await import('node:fs')
-const { detectKind, repoNamespace } = await import('../src/detect.js')
+const { detectKind, repoNamespace, repositoryFromEnv } =
+  await import('../src/detect.js')
 
 const mockStatSync = statSync as jest.MockedFunction<typeof statSync>
 
@@ -214,19 +215,55 @@ describe('repoNamespace', () => {
       expect(result).toEqual('x-y')
     })
 
-    it('handles undefined input without throwing', () => {
-      const result = repoNamespace(undefined)
-      expect(result).toEqual('000')
-    })
-
-    it('handles empty string without throwing', () => {
-      const result = repoNamespace('')
-      expect(result).toEqual('000')
-    })
+    it.each([undefined, '', '//', '---'])(
+      'returns undefined (server default namespace) for unusable input %p',
+      (input) => {
+        expect(repoNamespace(input)).toEqual(undefined)
+      }
+    )
 
     it('produces slug matching ^[a-z0-9-]{3,32}$ for standard repo', () => {
       const result = repoNamespace('kochetkov-ma/brewpage-action')
       expect(result).toMatch(/^[a-z0-9-]{3,32}$/)
     })
+  })
+})
+
+describe('repositoryFromEnv', () => {
+  // GIVEN the env shape of a CI runner
+  // WHEN the repository is derived
+  // THEN GitHub-compatible GITHUB_REPOSITORY wins, SourceCraft's REPO_URL is parsed, else undefined
+  it.each([
+    ['github', { GITHUB_REPOSITORY: 'Org/Repo' }, 'Org/Repo'],
+    [
+      'github wins over sourcecraft',
+      {
+        GITHUB_REPOSITORY: 'gh/one',
+        SOURCECRAFT_REPO_URL: 'https://git@git.sourcecraft.dev/sc/two.git'
+      },
+      'gh/one'
+    ],
+    [
+      'sourcecraft https',
+      {
+        SOURCECRAFT_REPO_URL:
+          'https://git@git.sourcecraft.dev/my-org/my-repo.git'
+      },
+      'my-org/my-repo'
+    ],
+    [
+      'sourcecraft ssh',
+      { SOURCECRAFT_REPO_URL: 'git@ssh.sourcecraft.dev:my-org/my-repo.git' },
+      'my-org/my-repo'
+    ],
+    [
+      'gitverse (no documented repository env)',
+      { GITVERSE_OUTPUT: '/tmp/out' },
+      undefined
+    ],
+    ['empty github value', { GITHUB_REPOSITORY: '' }, undefined],
+    ['nothing', {}, undefined]
+  ])('%s', (_name, env, expected) => {
+    expect(repositoryFromEnv(env as NodeJS.ProcessEnv)).toEqual(expected)
   })
 })

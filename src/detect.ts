@@ -34,15 +34,32 @@ function isDirectory(path: string): boolean {
   }
 }
 
-// Derive a deterministic, stable namespace slug from an "owner/repo" string,
-// conforming to ^[a-z0-9-]{3,32}$. Stable across runs for the same repository.
-export function repoNamespace(repository: string | undefined): string {
+// "owner/repo" of the running CI: GitHub-compatible GITHUB_REPOSITORY, else SourceCraft's REPO_URL.
+export function repositoryFromEnv(env: NodeJS.ProcessEnv): string | undefined {
+  const github = env.GITHUB_REPOSITORY?.trim()
+  if (github) {
+    return github
+  }
+  // Documented shape: https://git@git.sourcecraft.dev/<organization_slug>/<repository_slug>.git
+  const match = env.SOURCECRAFT_REPO_URL?.trim().match(
+    /([^/:]+)\/([^/]+?)(?:\.git)?\/?$/
+  )
+  return match ? `${match[1]}/${match[2]}` : undefined
+}
+
+// Stable namespace slug (^[a-z0-9-]{3,32}$) from "owner/repo"; undefined when nothing usable.
+export function repoNamespace(
+  repository: string | undefined
+): string | undefined {
   const source = (repository ?? '').toLowerCase()
   let slug = source
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
 
+  if (slug.length === 0) {
+    return undefined
+  }
   if (slug.length > 32) {
     slug = slug.slice(0, 32).replace(/-+$/g, '')
   }

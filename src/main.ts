@@ -13,12 +13,20 @@ import {
   type HtmlFormat,
   type UpdateResponse
 } from './api.js'
-import { detectKind, repoNamespace, type Kind } from './detect.js'
+import {
+  detectKind,
+  repoNamespace,
+  repositoryFromEnv,
+  type Kind
+} from './detect.js'
 import { buildSummary } from './summary.js'
 
 const DEFAULT_BASE_URL = 'https://brewpage.app'
 const MIN_TTL = 1
 const MAX_TTL = 90
+const NO_NAMESPACE_UPDATE =
+  'Updating needs a namespace, but none was given and the CI environment has no repository slug ' +
+  '(GITHUB_REPOSITORY or SOURCECRAFT_REPO_URL): set the namespace input.'
 
 type Mode = 'auto' | 'create' | 'update'
 
@@ -73,9 +81,10 @@ export async function run(): Promise<void> {
   try {
     const path = core.getInput('path', { required: true })
     const baseUrl = optional(core.getInput('brewpage-url')) ?? DEFAULT_BASE_URL
+    // No input and no repository env -> undefined: ns is omitted and the server picks its default.
     const namespace =
       optional(core.getInput('namespace')) ??
-      repoNamespace(process.env.GITHUB_REPOSITORY)
+      repoNamespace(repositoryFromEnv(process.env))
     const password = optional(core.getInput('password'))
     const tags = optional(core.getInput('tags'))
     const entry = optional(core.getInput('entry'))
@@ -133,6 +142,17 @@ export async function run(): Promise<void> {
     core.setOutput('namespace', result.namespace)
     core.setOutput('expires-at', result.expiresAt ?? '')
 
+    // Runners without job summaries (no GITHUB_STEP_SUMMARY): log the essentials instead of failing.
+    if (!process.env.GITHUB_STEP_SUMMARY) {
+      core.info(`Published to BrewPage: ${result.link}`)
+      if (minted) {
+        core.notice(
+          'A new owner token was minted: store the owner-token step output as a secret and pass it back ' +
+            'via the owner-token input, or the resource cannot be updated or deleted later.'
+        )
+      }
+      return
+    }
     await buildSummary(core, {
       link: result.link,
       ownerLink: result.ownerLink,
@@ -165,7 +185,7 @@ interface ResolveTargetArgs {
   ownerToken: string
   minted: boolean
   baseUrl: string
-  namespace: string
+  namespace?: string
   kind: Kind
 }
 
@@ -198,6 +218,17 @@ async function resolveTargetId(args: ResolveTargetArgs): Promise<Target> {
           'cannot be updated in place. Use mode=create (a new resource is published each run).'
       )
     }
+    return { discovered: false }
+  }
+
+  if (namespace === undefined) {
+    if (mode === 'update') {
+      throw new Error(NO_NAMESPACE_UPDATE)
+    }
+    core.info(
+      'No namespace input and no repository slug in the CI environment: creating a new resource. ' +
+        'Set namespace to republish to the same URL on later runs.'
+    )
     return { discovered: false }
   }
 
@@ -236,7 +267,7 @@ interface PublishArgs {
   discovered: boolean
   path: string
   baseUrl: string
-  namespace: string
+  namespace?: string
   ttl: number
   tags?: string
   entry?: string
@@ -288,6 +319,15 @@ async function update(
   id: string
 ): Promise<Result | undefined> {
   const { kind, path, baseUrl, namespace, ttl, entry, ownerToken } = args
+  if (kind === 'file') {
+    core.warning(
+      'A file artefact cannot be updated in place (files are immutable). Creating a new resource instead.'
+    )
+    return undefined
+  }
+  if (namespace === undefined) {
+    throw new Error(NO_NAMESPACE_UPDATE)
+  }
   if (kind === 'site') {
     return toResult(
       await putSite(baseUrl, {
@@ -301,23 +341,17 @@ async function update(
       'updated'
     )
   }
-  if (kind === 'html' || kind === 'markdown') {
-    return toResult(
-      await putHtml(baseUrl, {
-        body: await readText(path),
-        ns: namespace,
-        id,
-        ttl,
-        format: kind === 'markdown' ? 'markdown' : 'html',
-        ownerToken
-      }),
-      'updated'
-    )
-  }
-  core.warning(
-    'A file artefact cannot be updated in place (files are immutable). Creating a new resource instead.'
+  return toResult(
+    await putHtml(baseUrl, {
+      body: await readText(path),
+      ns: namespace,
+      id,
+      ttl,
+      format: kind === 'markdown' ? 'markdown' : 'html',
+      ownerToken
+    }),
+    'updated'
   )
-  return undefined
 }
 
 async function create(args: PublishArgs): Promise<Result> {

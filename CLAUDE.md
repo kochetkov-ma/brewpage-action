@@ -33,7 +33,7 @@ Backend (Spring/Kotlin), frontend, infra: NOT in any of these REPOs. SPEC is the
 
 `runs.using: node24`, `main: dist/index.js` — single committed bundle (Rollup). No Docker image, no composite bash steps. TS source in `src/`, runtime dep `@actions/core` only; HTTP via native `fetch`/`FormData`/`Blob` (Node 24 undici).
 
-Flow: `inputs → mint-or-reuse OT (setSecret) → detect kind + resolve NS → resolve target id (mode + discovery) → route create (POST) | update (PUT) → outputs + job summary`
+Flow: `inputs → mint-or-reuse OT (setSecret) → detect kind + resolve NS → resolve target id (mode + discovery) → route create (POST) | update (PUT) → outputs + job summary (only when `GITHUB_STEP_SUMMARY` is set)`
 
 ### Inputs (keep in lockstep with `action.yml`)
 
@@ -41,7 +41,7 @@ Flow: `inputs → mint-or-reuse OT (setSecret) → detect kind + resolve NS → 
 |-------|-----|---------|-------------|
 | `path` | yes | — | File, dir, or `.zip` to publish. |
 | `kind` | no | `auto` | `html` \| `markdown` \| `site` \| `file` \| `auto` |
-| `namespace` | no | _(empty)_ | Empty derives per-repo slug from `github.repository` (custom NS: unlisted, noindex, link still opens). `public`: pages, sites and files in gallery + sitemap, Google/Bing/AI search can find and index them; anyone can read it, no secrets/personal data. Copy: `README.md` Public or unlisted. |
+| `namespace` | no | _(empty)_ | Empty derives per-repo slug from `GITHUB_REPOSITORY` (SourceCraft: `SOURCECRAFT_REPO_URL`; neither: `ns` omitted -> server default, discovery skipped) (custom NS: unlisted, noindex, link still opens). `public`: pages, sites and files in gallery + sitemap, Google/Bing/AI search can find and index them; anyone can read it, no secrets/personal data. Copy: `README.md` Public or unlisted. |
 | `password` | no | _(empty)_ | Access password; protected resource hidden from gallery. Independent of NS/delivery mode; NEW browser links use clean trusted unlock. |
 | `ttl-days` | no | `15` | TTL in days (1..90; server clamps by account). |
 | `tags` | no | _(empty)_ | Comma-separated tags. |
@@ -58,7 +58,7 @@ Update routing handled in TS (`src/main.ts`, `resolveTargetId` + `publish`):
 - **Discover-by-owner.** `discoverOwnResource` calls `GET /api/gallery?mine=true` (OT-scoped), filters to the resolved NS + artefact kind, skipping `routingCohort: old` rows (made before 5 October 2026, read-only). Exactly one match → its id (→ PUT). Zero → POST create. Ambiguous (>1) → warn + PUT the oldest match (caller passes `update-id` to target another). Discovered target 409 read-only → `mode=auto` creates a new one; `mode=update` fails.
 - **PUT vs POST.** Resolved target id present → PUT (`putSite` / `putHtml`); else POST (`postSite` / `postHtml` / `postFile`).
 - **Files immutable.** No PUT for `/api/files`; a `file` artefact always creates a new resource even if a target id was resolved (warns).
-- **NS scope.** Discovery is bounded by the deterministic per-repo NS (from `github.repository`) + kind, so each repo+kind maps to its own auto-republished resource.
+- **NS scope.** Discovery is bounded by the deterministic per-repo NS (from `GITHUB_REPOSITORY`|`SOURCECRAFT_REPO_URL`) + kind, so each repo+kind maps to its own auto-republished resource.
 
 ### Outputs (keep in lockstep with `action.yml`)
 

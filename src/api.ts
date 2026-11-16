@@ -232,7 +232,7 @@ export async function postHtml(
   baseUrl: string,
   options: {
     body: string
-    ns: string
+    ns?: string
     ttl: number
     tags?: string
     format: HtmlFormat
@@ -320,7 +320,7 @@ export async function postFile(
   baseUrl: string,
   options: {
     filePath: string
-    ns: string
+    ns?: string
     ttl: number
     tags?: string
     ownerToken?: string
@@ -391,7 +391,7 @@ export async function postSite(
   baseUrl: string,
   options: {
     dirOrZip: string
-    ns: string
+    ns?: string
     ttl: number
     tags?: string
     entry?: string

@@ -30456,7 +30456,7 @@ var core = /*#__PURE__*/Object.freeze({
 });
 
 var name = "brewpage-action";
-var version = "1.2.4";
+var version = "1.2.5";
 var pkg = {
 	name: name,
 	version: version};
@@ -30782,14 +30782,26 @@ function isDirectory(path) {
         return false;
     }
 }
-// Derive a deterministic, stable namespace slug from an "owner/repo" string,
-// conforming to ^[a-z0-9-]{3,32}$. Stable across runs for the same repository.
+// "owner/repo" of the running CI: GitHub-compatible GITHUB_REPOSITORY, else SourceCraft's REPO_URL.
+function repositoryFromEnv(env) {
+    const github = env.GITHUB_REPOSITORY?.trim();
+    if (github) {
+        return github;
+    }
+    // Documented shape: https://git@git.sourcecraft.dev/<organization_slug>/<repository_slug>.git
+    const match = env.SOURCECRAFT_REPO_URL?.trim().match(/([^/:]+)\/([^/]+?)(?:\.git)?\/?$/);
+    return match ? `${match[1]}/${match[2]}` : undefined;
+}
+// Stable namespace slug (^[a-z0-9-]{3,32}$) from "owner/repo"; undefined when nothing usable.
 function repoNamespace(repository) {
     const source = (repository ?? '').toLowerCase();
     let slug = source
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-+|-+$/g, '');
+    if (slug.length === 0) {
+        return undefined;
+    }
     if (slug.length > 32) {
         slug = slug.slice(0, 32).replace(/-+$/g, '');
     }
@@ -30844,6 +30856,8 @@ async function buildSummary(coreModule, data) {
 const DEFAULT_BASE_URL = 'https://brewpage.app';
 const MIN_TTL = 1;
 const MAX_TTL = 90;
+const NO_NAMESPACE_UPDATE = 'Updating needs a namespace, but none was given and the CI environment has no repository slug ' +
+    '(GITHUB_REPOSITORY or SOURCECRAFT_REPO_URL): set the namespace input.';
 function parseMode(raw) {
     if (raw === 'create' || raw === 'update') {
         return raw;
@@ -30875,8 +30889,9 @@ async function run() {
     try {
         const path = getInput('path', { required: true });
         const baseUrl = optional(getInput('brewpage-url')) ?? DEFAULT_BASE_URL;
+        // No input and no repository env -> undefined: ns is omitted and the server picks its default.
         const namespace = optional(getInput('namespace')) ??
-            repoNamespace(process.env.GITHUB_REPOSITORY);
+            repoNamespace(repositoryFromEnv(process.env));
         const password = optional(getInput('password'));
         const tags = optional(getInput('tags'));
         const entry = optional(getInput('entry'));
@@ -30926,6 +30941,15 @@ async function run() {
         setOutput('id', result.id);
         setOutput('namespace', result.namespace);
         setOutput('expires-at', result.expiresAt ?? '');
+        // Runners without job summaries (no GITHUB_STEP_SUMMARY): log the essentials instead of failing.
+        if (!process.env.GITHUB_STEP_SUMMARY) {
+            info(`Published to BrewPage: ${result.link}`);
+            if (minted) {
+                notice('A new owner token was minted: store the owner-token step output as a secret and pass it back ' +
+                    'via the owner-token input, or the resource cannot be updated or deleted later.');
+            }
+            return;
+        }
         await buildSummary(core, {
             link: result.link,
             ownerLink: result.ownerLink,
@@ -30971,6 +30995,14 @@ async function resolveTargetId(args) {
             throw new Error('mode=update is not supported for file artefacts: files are immutable and ' +
                 'cannot be updated in place. Use mode=create (a new resource is published each run).');
         }
+        return { discovered: false };
+    }
+    if (namespace === undefined) {
+        if (mode === 'update') {
+            throw new Error(NO_NAMESPACE_UPDATE);
+        }
+        info('No namespace input and no repository slug in the CI environment: creating a new resource. ' +
+            'Set namespace to republish to the same URL on later runs.');
         return { discovered: false };
     }
     if (mode === 'auto' || mode === 'update') {
@@ -31024,6 +31056,13 @@ async function publish(args) {
 // PUT the resolved target; undefined for files, which are immutable (caller creates).
 async function update(args, id) {
     const { kind, path, baseUrl, namespace, ttl, entry, ownerToken } = args;
+    if (kind === 'file') {
+        warning('A file artefact cannot be updated in place (files are immutable). Creating a new resource instead.');
+        return undefined;
+    }
+    if (namespace === undefined) {
+        throw new Error(NO_NAMESPACE_UPDATE);
+    }
     if (kind === 'site') {
         return toResult(await putSite(baseUrl, {
             dirOrZip: path,
@@ -31034,18 +31073,14 @@ async function update(args, id) {
             ownerToken
         }), 'updated');
     }
-    if (kind === 'html' || kind === 'markdown') {
-        return toResult(await putHtml(baseUrl, {
-            body: await readText(path),
-            ns: namespace,
-            id,
-            ttl,
-            format: kind === 'markdown' ? 'markdown' : 'html',
-            ownerToken
-        }), 'updated');
-    }
-    warning('A file artefact cannot be updated in place (files are immutable). Creating a new resource instead.');
-    return undefined;
+    return toResult(await putHtml(baseUrl, {
+        body: await readText(path),
+        ns: namespace,
+        id,
+        ttl,
+        format: kind === 'markdown' ? 'markdown' : 'html',
+        ownerToken
+    }), 'updated');
 }
 async function create(args) {
     const { kind, path, baseUrl, namespace, ttl, tags, entry, password, ownerToken, showTopBar } = args;

@@ -20,7 +20,7 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 |-------|----------|---------|-------------|
 | `path` | yes | -- | File, directory, or `.zip` to publish to [brewpage.app](https://brewpage.app). |
 | `kind` | no | `auto` | Artefact kind: `html`, `markdown`, `site`, `file`, or `auto`. |
-| `namespace` | no | _(empty)_ | Empty (default): a per-repo namespace derived from `github.repository` (e.g. `octo-org-my-repo`), unlisted and not indexed. `public`: public pages, sites and files are listed in the public gallery and the sitemap, so Google, Bing and AI search can find and index them; anyone can find and read it. See [Public or unlisted](#public-or-unlisted). |
+| `namespace` | no | _(empty)_ | Empty (default): a per-repo namespace derived from the repository (`GITHUB_REPOSITORY`, on SourceCraft `SOURCECRAFT_REPO_URL`; e.g. `octo-org-my-repo`), unlisted and not indexed. `public`: public pages, sites and files are listed in the public gallery and the sitemap, so Google, Bing and AI search can find and index them; anyone can find and read it. See [Public or unlisted](#public-or-unlisted). |
 | `password` | no | _(empty)_ | Optional access password; protected resources are hidden from the gallery. NEW browser links stay clean and unlock through `unlock.brewpage.app`; password protection does not select delivery mode. |
 | `ttl-days` | no | `15` | Requested creation TTL in days (1..90), subject to account limits. PUT retains the original expiry; use the returned `expires-at`. |
 | `tags` | no | _(empty)_ | Comma-separated tags used for search and grouping on [brewpage.app](https://brewpage.app). |
@@ -46,7 +46,7 @@ A Node 24 TypeScript action that publishes your artefact to [BrewPage](https://b
 ## Public or unlisted
 
 - **`namespace: public`**: public pages, sites and files are listed in the public gallery and the sitemap, so Google, Bing and AI search can find and index them and people can discover them. Use it for anything meant to be found or shared: docs, guides, demos, portfolios, reports, landing pages. Public pages are served right on the brewpage.app domain, which gives them the strongest reach in search; a page whose code needs its own origin (cookies, storage) gets its own subdomain automatically. Anyone can find and read a public page: never put secrets, tokens or personal data there.
-- **`namespace` empty (default)**: the action publishes to a per-repo namespace derived from `github.repository` (e.g. `octo-org-my-repo`). It is unlisted and not indexed; anyone who has the link can still open it. Use `password` to restrict access.
+- **`namespace` empty (default)**: the action publishes to a per-repo namespace derived from the repository (`GITHUB_REPOSITORY`, on SourceCraft `SOURCECRAFT_REPO_URL`; e.g. `octo-org-my-repo`). It is unlisted and not indexed; anyone who has the link can still open it. Use `password` to restrict access.
 - Any other value is a custom namespace and behaves like the default. Discovery is per namespace, so changing it starts a new publication (`mode: auto`).
 
 ## Hosting and access
@@ -130,7 +130,7 @@ Use this when you already created the resource (manually or in an earlier run) a
 
 ### 4. Full-auto redeploy (most automatic, one extra request)
 
-Use this when you just want "publish and keep one stable URL" without tracking the id. This is the default `mode: auto`. You pass `owner-token` + `path`; `namespace` is optional and defaults to a deterministic per-repo slug (derived from `github.repository`).
+Use this when you just want "publish and keep one stable URL" without tracking the id. This is the default `mode: auto`. You pass `owner-token` + `path`; `namespace` is optional and defaults to a deterministic per-repo slug (derived from `GITHUB_REPOSITORY`, on SourceCraft `SOURCECRAFT_REPO_URL`).
 
 ```yaml
 - name: Publish (auto-republish)
@@ -189,10 +189,10 @@ Use this when you just want "publish and keep one stable URL" without tracking t
 
 ## SourceCraft / GitVerse
 
-Both Russian code hosts run GitHub Actions, but neither has been tested with this action, and neither documents which `runs.using` runtimes it supports. This action runs on `node24`, so the runner must provide Node 24 for JavaScript actions. Two more GitHub-only details matter outside GitHub:
+Both Russian code hosts run GitHub Actions; neither documents which `runs.using` runtimes it supports. This action runs on `node24`, so the runner must provide Node 24 for JavaScript actions. Since v1.2.5 the action needs no GitHub-only environment:
 
-- `namespace` defaults to a slug of `GITHUB_REPOSITORY`. A runner that does not set it would put every repository into the same fallback namespace, so set `namespace` explicitly.
-- After publishing, the action writes a job summary to `GITHUB_STEP_SUMMARY`. A runner without it fails the step after the upload succeeded; `fail-on-error: "false"` turns that into a warning, and it also turns real publish errors into warnings, so read the log.
+- `namespace` defaults to a slug of `GITHUB_REPOSITORY`, and on SourceCraft of `SOURCECRAFT_REPO_URL` ([predefined variables](https://sourcecraft.dev/portal/docs/en/sourcecraft/ci-cd-ref/predefined-variables)). A runner with neither omits `ns`, so each run creates a new publication in the server's default private namespace; set `namespace` to keep one URL across runs. GitVerse documents no repository variable, so its example sets `namespace`.
+- The job summary is written only when the runner provides `GITHUB_STEP_SUMMARY`; otherwise the link (and a note when a new owner token was minted) goes to the log.
 
 **SourceCraft** runs GitHub Actions as `action:` cubes on cloud workers ([docs](https://sourcecraft.dev/portal/docs/ru/sourcecraft/concepts/gh-actions)) and takes secrets as `${{ secrets.<name> }}`. `.sourcecraft/ci.yaml`:
 
@@ -206,12 +206,10 @@ workflows:
       - name: publish
         cubes:
           - name: brewpage
-            action: kochetkov-ma/brewpage-action@v1.2.4
+            action: kochetkov-ma/brewpage-action@v1.2.5
             with:
               path: ./report.html
-              namespace: my-project-reports
               owner-token: ${{ secrets.BREWPAGE_OWNER_TOKEN }}
-              fail-on-error: "false"
 ```
 
 **GitVerse** reads workflows from `.gitverse/workflows/` with GitHub Actions syntax ([docs](https://gitverse.ru/docs/cicd/faq)). It resolves `owner/repo` actions on gitverse.ru (its `actions/checkout` is a copy of the GitHub one), so the step uses the GitVerse copy of this action, `brewpage/brewpage-action`, which this repository's mirror workflow keeps in sync (tags included). `.gitverse/workflows/brewpage.yml`:
@@ -229,12 +227,11 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - name: Publish to BrewPage
         id: brewpage
-        uses: brewpage/brewpage-action@v1.2.4
+        uses: brewpage/brewpage-action@v1.2.5
         with:
           path: ./report.html
           namespace: my-project-reports
           owner-token: ${{ secrets.BREWPAGE_OWNER_TOKEN }}
-          fail-on-error: "false"
       - run: echo "Published to ${{ steps.brewpage.outputs.url }}"
 ```
 
