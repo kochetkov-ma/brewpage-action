@@ -187,6 +187,59 @@ Use this when you just want "publish and keep one stable URL" without tracking t
 
 > Reference the action by major tag (`@v1`) or an exact `@vX.Y.Z` -- never `@main`. Pin every other `uses:` to an exact version too.
 
+## SourceCraft / GitVerse
+
+Both Russian code hosts run GitHub Actions, but neither has been tested with this action, and neither documents which `runs.using` runtimes it supports. This action runs on `node24`, so the runner must provide Node 24 for JavaScript actions. Two more GitHub-only details matter outside GitHub:
+
+- `namespace` defaults to a slug of `GITHUB_REPOSITORY`. A runner that does not set it would put every repository into the same fallback namespace, so set `namespace` explicitly.
+- After publishing, the action writes a job summary to `GITHUB_STEP_SUMMARY`. A runner without it fails the step after the upload succeeded; `fail-on-error: "false"` turns that into a warning, and it also turns real publish errors into warnings, so read the log.
+
+**SourceCraft** runs GitHub Actions as `action:` cubes on cloud workers ([docs](https://sourcecraft.dev/portal/docs/ru/sourcecraft/concepts/gh-actions)) and takes secrets as `${{ secrets.<name> }}`. `.sourcecraft/ci.yaml`:
+
+```yaml
+on:
+  push: publish-report
+
+workflows:
+  publish-report:
+    tasks:
+      - name: publish
+        cubes:
+          - name: brewpage
+            action: kochetkov-ma/brewpage-action@v1.2.4
+            with:
+              path: ./report.html
+              namespace: my-project-reports
+              owner-token: ${{ secrets.BREWPAGE_OWNER_TOKEN }}
+              fail-on-error: "false"
+```
+
+**GitVerse** reads workflows from `.gitverse/workflows/` with GitHub Actions syntax ([docs](https://gitverse.ru/docs/cicd/faq)). It resolves `owner/repo` actions on gitverse.ru (its `actions/checkout` is a copy of the GitHub one), so the step uses the GitVerse copy of this action, `brewpage/brewpage-action`, which this repository's mirror workflow keeps in sync (tags included). `.gitverse/workflows/brewpage.yml`:
+
+```yaml
+name: Publish report
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Publish to BrewPage
+        id: brewpage
+        uses: brewpage/brewpage-action@v1.2.4
+        with:
+          path: ./report.html
+          namespace: my-project-reports
+          owner-token: ${{ secrets.BREWPAGE_OWNER_TOKEN }}
+          fail-on-error: "false"
+      - run: echo "Published to ${{ steps.brewpage.outputs.url }}"
+```
+
+Where the action cannot run, one `curl` step publishes the same file: `curl -fsS -X POST 'https://brewpage.app/api/files?ns=my-project-reports' -H "X-Owner-Token: $BREWPAGE_OWNER_TOKEN" -F 'file=@report.html'` (`.html` and `.md` files become pages; the answer carries `link`).
+
 ## Related
 
 - [brewpage.app](https://brewpage.app): the hosting service; [API guide](https://brewpage.app/api); [OpenAPI docs](https://kochetkov-ma.github.io/brewpage-openapi/)
