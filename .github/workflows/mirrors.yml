@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
     tags: ['**']
+  # Release moves v1 with GITHUB_TOKEN, which triggers no push run: re-mirror once it finishes.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
   workflow_dispatch:
     inputs:
       probe_failure:
